@@ -1,5 +1,21 @@
 import { useState, useMemo, useEffect } from 'react'
 import { CheckCircle, Circle, AlertCircle, ChevronLeft, GripVertical } from 'lucide-react'
+
+// Defined OUTSIDE GameSetupPage so React doesn't treat it as a new component
+// type on every render (which causes unmount/remount and scroll-to-top on iOS).
+function Step({ n, done, label, children }) {
+  return (
+    <div className="card mb-3">
+      <div className="flex items-center gap-2 mb-3">
+        {done
+          ? <CheckCircle size={20} className="text-green-500 shrink-0" />
+          : <Circle size={20} className="text-gray-300 shrink-0" />}
+        <h2 className="font-bold text-base">{n}. {label}</h2>
+      </div>
+      {children}
+    </div>
+  )
+}
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -155,18 +171,6 @@ export default function GameSetupPage({ onStart, onBack }) {
   const assignedCount = Object.keys(fieldingLineup).length
   const hasDraft = !!draft
 
-  const Step = ({ n, done, label, children }) => (
-    <div className="card mb-3">
-      <div className="flex items-center gap-2 mb-3">
-        {done
-          ? <CheckCircle size={20} className="text-green-500 shrink-0" />
-          : <Circle size={20} className="text-gray-300 shrink-0" />}
-        <h2 className="font-bold text-base">{n}. {label}</h2>
-      </div>
-      {children}
-    </div>
-  )
-
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
 
@@ -287,7 +291,7 @@ export default function GameSetupPage({ onStart, onBack }) {
             <p className="text-xs font-semibold text-gray-500 mb-1">{type}</p>
             <div className="flex flex-wrap gap-2">
               {players.map(p => (
-                <button key={p.id} onClick={() => togglePlayer(p.name)}
+                <button key={p.id} type="button" onClick={() => togglePlayer(p.name)}
                   className={`btn btn-sm ${selected.includes(p.name) ? 'btn-primary' : 'btn-ghost'}`}>
                   {p.name}
                 </button>
