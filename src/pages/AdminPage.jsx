@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Lock, Plus, Trash2, ToggleLeft, ToggleRight, KeyRound, ChevronLeft, Trophy } from 'lucide-react'
-import { getRoster, addPlayer, updatePlayer, removePlayer, checkPin, setPin, getDivision, setDivision, getTeams, addTeam, removeTeam } from '../storage'
+import { useState, useRef } from 'react'
+import { Lock, Plus, Trash2, ToggleLeft, ToggleRight, KeyRound, ChevronLeft, Trophy, Download, Upload } from 'lucide-react'
+import { getRoster, addPlayer, updatePlayer, removePlayer, checkPin, setPin, getDivision, setDivision, getTeams, addTeam, removeTeam, exportAllData, importAllData } from '../storage'
 
 function PinGate({ onUnlock }) {
   const [pin, setPin] = useState('')
@@ -172,6 +172,71 @@ function LeagueSettings() {
   )
 }
 
+function BackupSection() {
+  const fileInputRef = useRef(null)
+  const [importMsg, setImportMsg] = useState(null)
+
+  function handleExport() {
+    const data = exportAllData()
+    const date = new Date().toISOString().slice(0, 10)
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `softball-backup-${date}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result)
+        if (!confirm(`This will overwrite your current roster, games, and league settings with the backup from ${data.exportedAt?.slice(0,10) || 'unknown date'}. Continue?`)) return
+        importAllData(data)
+        setImportMsg({ ok: true, text: 'Restored successfully — reload to see changes' })
+      } catch (err) {
+        setImportMsg({ ok: false, text: err.message || 'Failed to read backup file' })
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  return (
+    <div className="card mb-4">
+      <h3 className="font-semibold mb-3 flex items-center gap-2"><Download size={18} /> Backup &amp; Restore</h3>
+      <p className="text-xs text-gray-500 mb-3">
+        Export saves your roster, all games, and league settings as a JSON file.
+        Store it in iCloud, email it to yourself, or use it to move data to another device.
+      </p>
+      <div className="flex gap-2 mb-3">
+        <button onClick={handleExport} className="btn btn-primary btn-sm flex-1 gap-1">
+          <Download size={14} /> Export backup
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} className="btn btn-ghost btn-sm flex-1 gap-1">
+          <Upload size={14} /> Restore backup
+        </button>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={handleImportFile}
+      />
+      {importMsg && (
+        <p className={`text-sm ${importMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+          {importMsg.ok ? '✅' : '⚠️'} {importMsg.text}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function AdminPage({ onBack }) {
   const [unlocked, setUnlocked] = useState(false)
   const [roster, setRoster] = useState(getRoster)
@@ -233,6 +298,8 @@ export default function AdminPage({ onBack }) {
       </p>
 
       <ChangePinForm />
+
+      <BackupSection />
     </div>
   )
 }

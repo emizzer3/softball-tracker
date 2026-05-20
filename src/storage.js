@@ -129,6 +129,31 @@ export function getActiveGame() { return get(K.ACTIVE_GAME, null) }
 export function setActiveGame(game) { set(K.ACTIVE_GAME, game) }
 export function clearActiveGame() { localStorage.removeItem(K.ACTIVE_GAME) }
 
+// ── Backup / Restore ──────────────────────────────────────────
+export function exportAllData() {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    roster:      getRoster(),
+    games:       getGames(),
+    division:    getDivision(),
+    teams:       getTeams(),
+    tournaments: getTournaments(),
+    // note: active in-progress game and PIN are intentionally excluded
+  }
+}
+
+export function importAllData(data) {
+  if (!data?.version || !Array.isArray(data.roster)) {
+    throw new Error('Invalid backup file — not a Softball Tracker export')
+  }
+  saveRoster(data.roster)
+  set(K.GAMES,       data.games       || [])
+  setDivision(       data.division    || '')
+  saveTeams(         data.teams       || DEFAULT_TEAMS)
+  set(K.TOURNAMENTS, data.tournaments || [])
+}
+
 // ── Season stats (derived, not stored — computed from games) ──
 export function computeSeasonStats() {
   const games = getGames()

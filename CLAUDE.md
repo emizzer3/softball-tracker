@@ -63,7 +63,13 @@ npm run build    # verify no errors before pushing
 git push         # triggers auto-deploy, live in ~2 min
 ```
 
+## Planned / future features
+- **Data backup/export** — user wants a way to back up localStorage data remotely for safety
+  - Phase 1: Export/Import JSON file in Admin (download all data, re-import on new device)
+  - Phase 2: Optional Supabase free-tier cloud sync when internet is available
+  - Don't build until user asks — just keep in mind when touching Admin or storage
+
 ## What NOT to do
-- Don't suggest server-side solutions — this must stay fully client-side/offline
+- Don't suggest server-side solutions unless user explicitly asks for backup/sync feature
 - Don't add TypeScript — keep it plain JSX
 - Don't change the BBH/SBH alternation rule — it's a hard team requirement
