@@ -1,5 +1,8 @@
 import { useState, useMemo, useEffect } from 'react'
-import { CheckCircle, Circle, ChevronUp, ChevronDown, AlertCircle, ChevronLeft } from 'lucide-react'
+import { CheckCircle, Circle, AlertCircle, ChevronLeft, GripVertical } from 'lucide-react'
+import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft } from '../storage'
 
 const GAME_TYPES = ['Friendly','League','Tournament']
@@ -95,16 +98,12 @@ export default function GameSetupPage({ onStart, onBack }) {
     setOrder(selected.slice())
   }
 
-  function moveUp(i) {
-    if (i === 0) return
-    const o = [...order]; [o[i], o[i-1]] = [o[i-1], o[i]]
-    setOrder(o); setOrderOk(false)
-  }
-
-  function moveDown(i) {
-    if (i === order.length - 1) return
-    const o = [...order]; [o[i], o[i+1]] = [o[i+1], o[i]]
-    setOrder(o); setOrderOk(false)
+  function handleDragEnd(event) {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      setOrder(prev => arrayMove(prev, prev.indexOf(active.id), prev.indexOf(over.id)))
+      setOrderOk(false)
+    }
   }
 
   function confirmOrder() {
@@ -144,6 +143,12 @@ export default function GameSetupPage({ onStart, onBack }) {
       playerPositions,
     })
   }
+
+  // DnD sensors — PointerSensor for desktop/mouse, TouchSensor for iPhone
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  )
 
   const bbh = roster.filter(p => p.type === 'BBH')
   const sbh = roster.filter(p => p.type === 'SBH')
@@ -302,25 +307,26 @@ export default function GameSetupPage({ onStart, onBack }) {
         {!playersOk
           ? <p className="text-sm text-gray-400">Lock players first</p>
           : <>
-            <p className="text-xs text-gray-500 mb-3">Tap the arrows to reorder. Must strictly alternate BBH ↔ SBH.</p>
-            <ul className="space-y-1 mb-3">
-              {order.map((name, i) => {
-                const type = rosterMap[name]
-                const clash = i > 0 && rosterMap[order[i-1]] === type
-                return (
-                  <li key={name} className={`flex items-center gap-2 p-2 rounded-lg border ${clash ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'}`}>
-                    <span className="text-gray-400 font-mono text-sm w-5">{i+1}.</span>
-                    <span className="flex-1 font-medium text-sm">{name}</span>
-                    <span className={type === 'BBH' ? 'badge-bbh' : 'badge-sbh'}>{type}</span>
-                    {clash && <span className="text-red-500 text-xs">clash!</span>}
-                    <div className="flex flex-col">
-                      <button onClick={() => moveUp(i)} disabled={i === 0} className="p-0.5 text-gray-400 disabled:opacity-20"><ChevronUp size={14} /></button>
-                      <button onClick={() => moveDown(i)} disabled={i === order.length-1} className="p-0.5 text-gray-400 disabled:opacity-20"><ChevronDown size={14} /></button>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+            <p className="text-xs text-gray-500 mb-3">
+              Drag <GripVertical size={12} className="inline text-gray-400" /> to reorder. Must strictly alternate BBH ↔ SBH.
+            </p>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={order} strategy={verticalListSortingStrategy}>
+                <ul className="space-y-1 mb-3">
+                  {order.map((name, i) => {
+                    const type = rosterMap[name]
+                    const clash = i > 0 && rosterMap[order[i-1]] === type
+                    return (
+                      <SortableOrderItem key={name} id={name} index={i} type={type} clash={clash} />
+                    )
+                  })}
+                </ul>
+              </SortableContext>
+            </DndContext>
             {orderErr && <p className="text-red-600 text-sm mb-2 flex gap-1"><AlertCircle size={14} className="shrink-0 mt-0.5" />{orderErr}</p>}
             <button onClick={confirmOrder} className="btn btn-warning btn-md w-full">
               {orderOk ? '✅ Order Confirmed' : 'Confirm Order'}
@@ -377,5 +383,44 @@ export default function GameSetupPage({ onStart, onBack }) {
         🥎 Start Game!
       </button>
     </div>
+  )
+}
+
+// Draggable row for the batting order list
+function SortableOrderItem({ id, index, type, clash }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 p-2 rounded-lg border select-none ${
+        isDragging
+          ? 'shadow-lg opacity-80 bg-blue-50 border-blue-300'
+          : clash
+            ? 'border-red-300 bg-red-50'
+            : 'border-gray-200 bg-white'
+      }`}
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="touch-none text-gray-300 p-1 cursor-grab active:cursor-grabbing shrink-0"
+        tabIndex={-1}
+      >
+        <GripVertical size={16} />
+      </button>
+      <span className="text-gray-400 font-mono text-sm w-5">{index + 1}.</span>
+      <span className="flex-1 font-medium text-sm">{id}</span>
+      <span className={type === 'BBH' ? 'badge-bbh' : 'badge-sbh'}>{type}</span>
+      {clash && <span className="text-red-500 text-xs font-semibold">clash!</span>}
+    </li>
   )
 }
