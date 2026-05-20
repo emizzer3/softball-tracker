@@ -129,6 +129,11 @@ export function getActiveGame() { return get(K.ACTIVE_GAME, null) }
 export function setActiveGame(game) { set(K.ACTIVE_GAME, game) }
 export function clearActiveGame() { localStorage.removeItem(K.ACTIVE_GAME) }
 
+// ── Setup draft (partial game setup, survives navigation) ─────
+export function getSetupDraft() { return get('sft_setup_draft', null) }
+export function saveSetupDraft(draft) { set('sft_setup_draft', draft) }
+export function clearSetupDraft() { localStorage.removeItem('sft_setup_draft') }
+
 // ── Backup / Restore ──────────────────────────────────────────
 export function exportAllData() {
   return {

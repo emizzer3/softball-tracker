@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { CheckCircle, Circle, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react'
-import { getRoster, getTeams, getDivision, getTournaments, rememberTournament } from '../storage'
+import { useState, useMemo, useEffect } from 'react'
+import { CheckCircle, Circle, ChevronUp, ChevronDown, AlertCircle, ChevronLeft } from 'lucide-react'
+import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft } from '../storage'
 
 const GAME_TYPES = ['Friendly','League','Tournament']
 export const POSITIONS = ['P','C','1B','2B','3B','SS','LF','LC','RC','RF','EF']
@@ -15,43 +15,54 @@ function validateOrder(order, rosterMap) {
   return null
 }
 
-export default function GameSetupPage({ onStart }) {
+export default function GameSetupPage({ onStart, onBack }) {
   const roster = useMemo(() => getRoster().filter(p => p.active), [])
   const rosterMap = useMemo(() => Object.fromEntries(roster.map(p => [p.name, p.type])), [roster])
   const teams = useMemo(() => [...getTeams(), 'Other'], [])
   const division = useMemo(() => getDivision(), [])
   const pastTournaments = useMemo(() => getTournaments(), [])
 
+  // Load draft on first render if one exists
+  const draft = useMemo(() => getSetupDraft(), [])
+
   // Step 1
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [gameType, setGameType] = useState('')
-  // League mode: dropdown value + "Other" free text
-  const [homeTeam, setHomeTeam] = useState('')
-  const [homeOther, setHomeOther] = useState('')
-  const [awayTeam, setAwayTeam] = useState('')
-  const [awayOther, setAwayOther] = useState('')
-  // Friendly/Tournament mode: direct free-text team names
-  const [homeFree, setHomeFree] = useState('')
-  const [awayFree, setAwayFree] = useState('')
-  // Tournament name
-  const [tournamentName, setTournamentName] = useState('')
-  const [innings, setInnings] = useState(7)
-  const [detailsOk, setDetailsOk] = useState(false)
-  const [detailsErr, setDetailsErr] = useState('')
+  const [date,           setDate]           = useState(() => draft?.date           ?? new Date().toISOString().split('T')[0])
+  const [gameType,       setGameType]       = useState(() => draft?.gameType       ?? '')
+  const [homeTeam,       setHomeTeam]       = useState(() => draft?.homeTeam       ?? '')
+  const [homeOther,      setHomeOther]      = useState(() => draft?.homeOther      ?? '')
+  const [awayTeam,       setAwayTeam]       = useState(() => draft?.awayTeam       ?? '')
+  const [awayOther,      setAwayOther]      = useState(() => draft?.awayOther      ?? '')
+  const [homeFree,       setHomeFree]       = useState(() => draft?.homeFree       ?? '')
+  const [awayFree,       setAwayFree]       = useState(() => draft?.awayFree       ?? '')
+  const [tournamentName, setTournamentName] = useState(() => draft?.tournamentName ?? '')
+  const [innings,        setInnings]        = useState(() => draft?.innings        ?? 7)
+  const [detailsOk,      setDetailsOk]      = useState(() => draft?.detailsOk     ?? false)
+  const [detailsErr,     setDetailsErr]     = useState('')
 
   // Step 2
-  const [selected, setSelected] = useState([])
-  const [playersOk, setPlayersOk] = useState(false)
+  const [selected,   setSelected]   = useState(() => draft?.selected   ?? [])
+  const [playersOk,  setPlayersOk]  = useState(() => draft?.playersOk  ?? false)
   const [playersErr, setPlayersErr] = useState('')
 
   // Step 3
-  const [order, setOrder] = useState([])
-  const [orderOk, setOrderOk] = useState(false)
+  const [order,    setOrder]    = useState(() => draft?.order    ?? [])
+  const [orderOk,  setOrderOk]  = useState(() => draft?.orderOk  ?? false)
   const [orderErr, setOrderErr] = useState('')
 
-  // Step 4: fielding lineup { position: playerName }
-  const [fieldingLineup, setFieldingLineup] = useState({})
-  const [fieldingOk, setFieldingOk] = useState(false)
+  // Step 4
+  const [fieldingLineup, setFieldingLineup] = useState(() => draft?.fieldingLineup ?? {})
+  const [fieldingOk,     setFieldingOk]     = useState(() => draft?.fieldingOk     ?? false)
+
+  // Auto-save draft whenever anything changes
+  useEffect(() => {
+    saveSetupDraft({
+      date, gameType, homeTeam, homeOther, awayTeam, awayOther,
+      homeFree, awayFree, tournamentName, innings, detailsOk,
+      selected, playersOk, order, orderOk, fieldingLineup, fieldingOk,
+    })
+  }, [date, gameType, homeTeam, homeOther, awayTeam, awayOther,
+      homeFree, awayFree, tournamentName, innings, detailsOk,
+      selected, playersOk, order, orderOk, fieldingLineup, fieldingOk])
 
   const isLeague = gameType === 'League'
   const home = isLeague ? (homeTeam === 'Other' ? homeOther : homeTeam) : homeFree
@@ -106,7 +117,6 @@ export default function GameSetupPage({ onStart }) {
     setFieldingOk(false)
     setFieldingLineup(prev => {
       const next = { ...prev }
-      // remove this player from any previous position
       Object.keys(next).forEach(k => { if (next[k] === player) delete next[k] })
       if (player) next[pos] = player
       else delete next[pos]
@@ -114,14 +124,12 @@ export default function GameSetupPage({ onStart }) {
     })
   }
 
-  function confirmFielding() {
-    setFieldingOk(true)
-  }
+  function confirmFielding() { setFieldingOk(true) }
 
   function startGame() {
+    clearSetupDraft()
     const rosterFull = getRoster()
     const gameRoster = order.map(name => rosterFull.find(p => p.name === name)).filter(Boolean)
-    // Build reverse map: player → position
     const playerPositions = Object.fromEntries(
       Object.entries(fieldingLineup).map(([pos, name]) => [name, pos])
     )
@@ -132,14 +140,15 @@ export default function GameSetupPage({ onStart }) {
       home, away, innings,
       battingOrder: order,
       roster: gameRoster,
-      fieldingLineup,    // { position: playerName }
-      playerPositions,   // { playerName: position } — reverse for quick lookup
+      fieldingLineup,
+      playerPositions,
     })
   }
 
   const bbh = roster.filter(p => p.type === 'BBH')
   const sbh = roster.filter(p => p.type === 'SBH')
   const assignedCount = Object.keys(fieldingLineup).length
+  const hasDraft = !!draft
 
   const Step = ({ n, done, label, children }) => (
     <div className="card mb-3">
@@ -155,9 +164,30 @@ export default function GameSetupPage({ onStart }) {
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
-      <h1 className="text-2xl font-bold mb-1">⚾ Game Setup</h1>
-      {division && <p className="text-sm text-gray-500 mb-4">{division}</p>}
-      {!division && <div className="mb-4" />}
+
+      {/* Header with back button */}
+      <div className="flex items-center gap-2 mb-1">
+        <button onClick={onBack} className="btn btn-ghost btn-sm p-1 -ml-1">
+          <ChevronLeft size={20} />
+        </button>
+        <h1 className="text-2xl font-bold">⚾ Game Setup</h1>
+      </div>
+      {division
+        ? <p className="text-sm text-gray-500 mb-3 ml-7">{division}</p>
+        : <div className="mb-3" />}
+
+      {/* Draft restored banner */}
+      {hasDraft && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-sm">
+          <span className="text-amber-800">↩ Setup restored from last time</span>
+          <button
+            onClick={() => { clearSetupDraft(); window.location.reload() }}
+            className="text-xs text-amber-600 underline ml-2 shrink-0"
+          >
+            Start fresh
+          </button>
+        </div>
+      )}
 
       {/* Step 1 */}
       <Step n={1} done={detailsOk} label="Game Details">
@@ -177,7 +207,7 @@ export default function GameSetupPage({ onStart }) {
             </div>
           </div>
 
-          {/* Tournament name — only for Tournament */}
+          {/* Tournament name */}
           {gameType === 'Tournament' && (
             <div>
               <label className="label">Tournament Name</label>
@@ -201,10 +231,9 @@ export default function GameSetupPage({ onStart }) {
             </div>
           )}
 
-          {/* Team inputs: League → dropdown, Friendly/Tournament → free text */}
+          {/* Team inputs */}
           <div className="grid grid-cols-2 gap-2">
             {isLeague ? (
-              // League: pick from managed teams list
               [['Home Team', homeTeam, setHomeTeam, homeOther, setHomeOther],
                ['Away Team', awayTeam, setAwayTeam, awayOther, setAwayOther]].map(([lbl, val, fn, otherVal, otherFn]) => (
                 <div key={lbl}>
@@ -220,7 +249,6 @@ export default function GameSetupPage({ onStart }) {
                 </div>
               ))
             ) : (
-              // Friendly / Tournament: free text
               [['Home Team', homeFree, setHomeFree], ['Away Team', awayFree, setAwayFree]].map(([lbl, val, fn]) => (
                 <div key={lbl}>
                   <label className="label">{lbl}</label>
@@ -230,6 +258,7 @@ export default function GameSetupPage({ onStart }) {
               ))
             )}
           </div>
+
           <div>
             <label className="label">Innings</label>
             <div className="flex gap-2">
