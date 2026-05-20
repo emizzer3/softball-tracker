@@ -138,23 +138,23 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
     g.bases = newBases
     g.batterIndex = g.done ? g.batterIndex : (g.batterIndex + 1) % battingOrder.length
 
-    setLastAction({ code, batter })
+    setLastAction(prev => ({ ...prev, code, batter, rbi: runs }))
     persist(g)
   }
 
   function applyOutcome(code) {
     if (code === 'K') {
-      // Auto-assign putout to catcher
       const catcher = setup.fieldingLineup?.['C']
       const extraLog = catcher
         ? [{ type: 'putout', fielder: catcher, assister: null, inning: gs.inning, half: gs.half, outCode: code, batter }]
         : []
+      setLastAction({ code, batter, rbi: 0, autoFielder: catcher || null, fielder: null, assister: null })
       finishOutcome(code, extraLog)
     } else if (code === 'G' || code === 'F') {
-      // Show modal to record who made the play
       setPendingOutCode(code)
       setShowPutout(true)
     } else {
+      setLastAction({ code, batter, rbi: 0, fielder: null, assister: null, autoFielder: null })
       finishOutcome(code)
     }
   }
@@ -163,6 +163,7 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
     const extraLog = fielder
       ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter }]
       : []
+    setLastAction({ code: pendingOutCode, batter, rbi: 0, fielder: fielder || null, assister: assister || null, autoFielder: null })
     finishOutcome(pendingOutCode, extraLog)
     setPendingOutCode(null)
     setShowPutout(false)
@@ -366,16 +367,9 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
         <button onClick={() => setShowSub(true)} className="btn btn-ghost btn-sm flex-1 gap-1">
           <Users size={14} /> Substitution
         </button>
-        <button onClick={undoLast} disabled={!lastAction} className="btn btn-ghost btn-sm flex-1 gap-1">
-          <RotateCcw size={14} /> Undo
-        </button>
       </div>
 
-      {lastAction && (
-        <div className="text-center text-xs text-gray-400 mb-2">
-          Last: {lastAction.batter} → {lastAction.code}
-        </div>
-      )}
+      {lastAction && <LastPlayCard action={lastAction} onUndo={undoLast} />}
 
       {/* Error logging */}
       <div className="card mb-3 p-3">
@@ -458,16 +452,24 @@ function PutoutModal({ outCode, battingOrder, playerPositions, onConfirm, onSkip
     pos: playerPositions?.[name] || '?',
   }))
 
-  const label = outCode === 'G' ? 'groundout' : 'flyout'
+  const label = outCode === 'G' ? 'Groundout' : 'Flyout'
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end z-50">
       <div className="bg-white rounded-t-2xl w-full p-4 max-h-[85vh] overflow-y-auto">
-        <h3 className="font-bold mb-0.5">Who made the {label}?</h3>
-        <p className="text-xs text-gray-500 mb-3">Tap a fielder for the putout, then optionally an assist.</p>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-lg">🧤</span>
+          <h3 className="font-bold">Record {label}</h3>
+        </div>
+        <p className="text-xs text-gray-500 mb-4">
+          Tap the fielder who got the out. Tap a second player if there was an assist. Skip if unsure.
+        </p>
 
         <div className="mb-3">
-          <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Putout</p>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Who got the out?</span>
+            <span className="text-xs bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
+          </div>
           <div className="grid grid-cols-4 gap-1">
             {players.map(({ name, pos }) => (
               <button
@@ -487,7 +489,10 @@ function PutoutModal({ outCode, battingOrder, playerPositions, onConfirm, onSkip
 
         {putoutPlayer && (
           <div className="mb-4">
-            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Assist (optional)</p>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Who threw/relayed? (optional)</span>
+              <span className="text-xs bg-amber-100 text-amber-600 font-semibold px-1.5 py-0.5 rounded">A</span>
+            </div>
             <div className="grid grid-cols-4 gap-1">
               {players.filter(p => p.name !== putoutPlayer).map(({ name, pos }) => (
                 <button
@@ -510,10 +515,79 @@ function PutoutModal({ outCode, battingOrder, playerPositions, onConfirm, onSkip
             disabled={!putoutPlayer}
             className="btn btn-success btn-md flex-1"
           >
-            Confirm
+            ✓ Log Play
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Outcome colour map for the last-play card
+const OUTCOME_META = {
+  '1B':  { label: 'Single',           bg: 'bg-green-50',  border: 'border-green-400', text: 'text-green-700' },
+  '2B':  { label: 'Double',           bg: 'bg-green-50',  border: 'border-green-400', text: 'text-green-700' },
+  '3B':  { label: 'Triple',           bg: 'bg-green-50',  border: 'border-green-400', text: 'text-green-700' },
+  'HR':  { label: 'Home Run',         bg: 'bg-green-50',  border: 'border-green-600', text: 'text-green-800' },
+  'BB':  { label: 'Walk',             bg: 'bg-blue-50',   border: 'border-blue-300',  text: 'text-blue-700'  },
+  'HBP': { label: 'Hit By Pitch',     bg: 'bg-blue-50',   border: 'border-blue-300',  text: 'text-blue-700'  },
+  'K':   { label: 'Strikeout',        bg: 'bg-red-50',    border: 'border-red-400',   text: 'text-red-700'   },
+  'F':   { label: 'Flyout',           bg: 'bg-red-50',    border: 'border-red-400',   text: 'text-red-700'   },
+  'G':   { label: 'Groundout',        bg: 'bg-red-50',    border: 'border-red-400',   text: 'text-red-700'   },
+  'E':   { label: 'On Error',         bg: 'bg-amber-50',  border: 'border-amber-400', text: 'text-amber-700' },
+  'FC':  { label: "Fielder's Choice", bg: 'bg-amber-50',  border: 'border-amber-400', text: 'text-amber-700' },
+  'SAC': { label: 'Sacrifice',        bg: 'bg-gray-50',   border: 'border-gray-300',  text: 'text-gray-600'  },
+}
+
+function LastPlayCard({ action, onUndo }) {
+  const meta = OUTCOME_META[action.code] || { label: action.code, bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' }
+  const isOut = ['K','F','G'].includes(action.code)
+
+  return (
+    <div className={`rounded-lg border-l-4 ${meta.border} ${meta.bg} p-3 mb-3 flex gap-3 items-start`}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`font-black text-lg ${meta.text}`}>{action.code}</span>
+          <span className="text-sm font-semibold text-gray-700">{action.batter}</span>
+          <span className="text-xs text-gray-500">{meta.label}</span>
+          {action.rbi > 0 && (
+            <span className="text-xs bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">
+              {action.rbi} RBI
+            </span>
+          )}
+        </div>
+
+        {/* Fielding line */}
+        {isOut && (
+          <div className="mt-1 text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
+            {action.autoFielder ? (
+              <>
+                <span className="bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
+                <span>{action.autoFielder}</span>
+                <span className="text-gray-400 italic">(auto — catcher)</span>
+              </>
+            ) : action.fielder ? (
+              <>
+                <span className="bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
+                <span>{action.fielder}</span>
+                {action.assister && (
+                  <>
+                    <span className="text-gray-300">·</span>
+                    <span className="bg-amber-100 text-amber-600 font-semibold px-1.5 py-0.5 rounded">A</span>
+                    <span>{action.assister}</span>
+                  </>
+                )}
+              </>
+            ) : (
+              <span className="italic text-gray-400">Fielding not recorded</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <button onClick={onUndo} className="btn btn-ghost btn-sm p-1 text-gray-400 shrink-0" title="Undo">
+        <RotateCcw size={15} />
+      </button>
     </div>
   )
 }
