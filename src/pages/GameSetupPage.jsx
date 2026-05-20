@@ -1,5 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
 import { CheckCircle, Circle, AlertCircle, ChevronLeft, GripVertical } from 'lucide-react'
+import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft } from '../storage'
 
 // Defined OUTSIDE GameSetupPage so React doesn't treat it as a new component
 // type on every render (which causes unmount/remount and scroll-to-top on iOS).
@@ -16,10 +20,6 @@ function Step({ n, done, label, children }) {
     </div>
   )
 }
-import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
-import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft } from '../storage'
 
 const GAME_TYPES = ['Friendly','League','Tournament']
 export const POSITIONS = ['P','C','1B','2B','3B','SS','LF','LC','RC','RF','EF']
@@ -318,6 +318,7 @@ export default function GameSetupPage({ onStart, onBack }) {
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
+              autoScroll={false}
             >
               <SortableContext items={order} strategy={verticalListSortingStrategy}>
                 <ul className="space-y-1 mb-3">
@@ -398,6 +399,7 @@ function SortableOrderItem({ id, index, type, clash }) {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 50 : undefined,
+    touchAction: 'none', // prevents iOS from stealing the touch during drag
   }
 
   return (
