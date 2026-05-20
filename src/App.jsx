@@ -5,13 +5,14 @@ import TrackerPage from './pages/TrackerPage'
 import ScoresheetPage from './pages/ScoresheetPage'
 import SummaryPage from './pages/SummaryPage'
 import SeasonStatsPage from './pages/SeasonStatsPage'
-import { saveGame, getActiveGame, clearActiveGame } from './storage'
-import { Settings, Plus, BarChart2 } from 'lucide-react'
+import { saveGame, getActiveGame, clearActiveGame, getSchedule } from './storage'
+import { Settings, Plus, BarChart2, CalendarDays } from 'lucide-react'
 
 const P = { HOME: 'home', ADMIN: 'admin', SETUP: 'setup', TRACKER: 'tracker', SCORESHEET: 'scoresheet', SUMMARY: 'summary', SEASON: 'season' }
 
 function HomePage({ onNav }) {
   const activeGame = getActiveGame()
+  const upcoming = getSchedule().filter(g => g.date >= new Date().toISOString().split('T')[0]).slice(0, 3)
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
@@ -30,6 +31,28 @@ function HomePage({ onNav }) {
               <p className="text-xs text-amber-700">{activeGame.setup?.away} @ {activeGame.setup?.home} · In progress</p>
             </div>
           </button>
+        )}
+
+        {upcoming.length > 0 && (
+          <div className="card p-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+              <CalendarDays size={12} /> Upcoming
+            </p>
+            <ul className="space-y-2">
+              {upcoming.map(g => (
+                <li key={g.id} className="flex items-center gap-2">
+                  <div className="text-center bg-blue-50 rounded px-2 py-1 min-w-10">
+                    <p className="text-xs font-bold text-blue-700">{new Date(g.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">vs {g.opponent}</p>
+                    <p className="text-xs text-gray-500">{g.time || ''}{g.location ? (g.time ? ' · ' : '') + g.location : ''}</p>
+                  </div>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{g.gameType || 'Game'}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <button onClick={() => onNav(P.SETUP)} className="card w-full text-left flex items-center gap-3 hover:bg-gray-50 transition-colors">
@@ -52,7 +75,7 @@ function HomePage({ onNav }) {
           <Settings size={28} className="text-gray-500 shrink-0" />
           <div>
             <p className="font-bold">Admin · Roster</p>
-            <p className="text-xs text-gray-500">Manage players · PIN required</p>
+            <p className="text-xs text-gray-500">Manage players, league settings · PIN required</p>
           </div>
         </button>
       </div>
@@ -81,9 +104,13 @@ export default function App() {
   }
 
   function handleGameEnd(completedGame) {
-    saveGame(completedGame)
+    // Determine W/L/D — assumes our team is always "home"
+    const { homeScore, awayScore } = completedGame
+    const result = homeScore > awayScore ? 'W' : homeScore < awayScore ? 'L' : 'D'
+    const gameWithResult = { ...completedGame, result }
+    saveGame(gameWithResult)
     clearActiveGame()
-    setFinishedGame(completedGame)
+    setFinishedGame(gameWithResult)
     setCurrentSetup(null)
     setPage(P.SCORESHEET)
   }
@@ -99,10 +126,18 @@ export default function App() {
         <TrackerPage setup={currentSetup} savedState={savedState} onEnd={handleGameEnd} />
       )}
       {page === P.SCORESHEET && finishedGame && (
-        <ScoresheetPage game={finishedGame} onHome={() => setPage(P.HOME)} />
+        <ScoresheetPage
+          game={finishedGame}
+          onHome={() => setPage(P.HOME)}
+          onSummary={() => setPage(P.SUMMARY)}
+        />
       )}
       {page === P.SUMMARY    && finishedGame && (
-        <SummaryPage game={finishedGame} onHome={() => setPage(P.HOME)} />
+        <SummaryPage
+          game={finishedGame}
+          onHome={() => setPage(P.HOME)}
+          onScoresheet={() => setPage(P.SCORESHEET)}
+        />
       )}
       {page === P.SEASON     && (
         <SeasonStatsPage

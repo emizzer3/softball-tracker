@@ -7,6 +7,7 @@ const K = {
   DIVISION:    'sft_division',
   TEAMS:       'sft_teams',
   TOURNAMENTS: 'sft_tournaments',
+  SCHEDULE:    'sft_schedule',
 }
 
 const DEFAULT_TEAMS = [
@@ -45,13 +46,8 @@ const DEFAULT_ROSTER = [
   { id: 'sarah',     name: 'Sarah',     type: 'SBH', active: true },
 ]
 
-export function getRoster() {
-  return get(K.ROSTER, DEFAULT_ROSTER)
-}
-
-export function saveRoster(roster) {
-  set(K.ROSTER, roster)
-}
+export function getRoster() { return get(K.ROSTER, DEFAULT_ROSTER) }
+export function saveRoster(roster) { set(K.ROSTER, roster) }
 
 export function addPlayer(name, type) {
   const roster = getRoster()
@@ -100,9 +96,24 @@ export function removeTeam(name) {
 export function getTournaments() { return get(K.TOURNAMENTS, []) }
 export function rememberTournament(name) {
   if (!name?.trim()) return
-  // keep most recent first, deduplicate, cap at 10
   const list = [name, ...getTournaments().filter(t => t !== name)].slice(0, 10)
   set(K.TOURNAMENTS, list)
+}
+
+// ── Schedule (upcoming fixtures) ─────────────────────────────
+export function getSchedule() { return get(K.SCHEDULE, []) }
+export function saveSchedule(schedule) { set(K.SCHEDULE, schedule) }
+export function addFixture(fixture) {
+  const schedule = getSchedule()
+  schedule.push({ id: Date.now().toString(), ...fixture })
+  schedule.sort((a, b) => a.date.localeCompare(b.date))
+  saveSchedule(schedule)
+  return getSchedule()
+}
+export function removeFixture(id) {
+  const schedule = getSchedule().filter(f => f.id !== id)
+  saveSchedule(schedule)
+  return schedule
 }
 
 // ── Games ─────────────────────────────────────────────────────
@@ -144,7 +155,7 @@ export function exportAllData() {
     division:    getDivision(),
     teams:       getTeams(),
     tournaments: getTournaments(),
-    // note: active in-progress game and PIN are intentionally excluded
+    schedule:    getSchedule(),
   }
 }
 
@@ -157,6 +168,7 @@ export function importAllData(data) {
   setDivision(       data.division    || '')
   saveTeams(         data.teams       || DEFAULT_TEAMS)
   set(K.TOURNAMENTS, data.tournaments || [])
+  if (data.schedule) saveSchedule(data.schedule)
 }
 
 // ── Season stats (derived, not stored — computed from games) ──
@@ -168,9 +180,9 @@ export function computeSeasonStats() {
     if (!stats[name]) {
       stats[name] = {
         name,
-        G: new Set(),
+        G: new Set(), W: 0, L: 0, D: 0,
         // batting
-        AB: 0, H: 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, K: 0, SB: 0,
+        AB: 0, H: 0, '1B': 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, K: 0, SB: 0,
         // fielding
         PO: 0, A: 0, E: 0,
       }
@@ -179,24 +191,30 @@ export function computeSeasonStats() {
   }
 
   for (const game of games) {
+    const result = game.result // 'W' | 'L' | 'D' | undefined
+
     for (const ab of (game.atBats || [])) {
       const s = ensure(ab.batter)
       s.G.add(game.id)
+      if (result === 'W') s.W++
+      else if (result === 'L') s.L++
+      else if (result === 'D') s.D++
+
       const outcome = ab.outcome || ''
       if (!['BB', 'HBP', 'SAC'].includes(outcome)) s.AB++
-      if (['1B','2B','3B','HR'].includes(outcome)) s.H++
-      if (outcome === '2B') s['2B']++
-      if (outcome === '3B') s['3B']++
-      if (outcome === 'HR') s.HR++
+      if (['1B','2B','3B','HR'].includes(outcome)) { s.H++; s[outcome]++ }
       if (outcome === 'BB') s.BB++
       if (outcome === 'K')  s.K++
       s.RBI += (ab.rbi || 0)
+      // Credit a run to the batter when they score (RBI on their own HR, or RBI>0 approximation)
+      if (outcome === 'HR') s.R++
     }
+
     // runs, stolen bases, putouts, assists, errors from play log
     for (const play of (game.playLog || [])) {
-      if (play.type === 'run' && play.player)    ensure(play.player).R++
-      if (play.type === 'sb'  && play.player)    ensure(play.player).SB++
-      if (play.type === 'error' && play.fielder) ensure(play.fielder).E++
+      if (play.type === 'run'    && play.player)   ensure(play.player).R++
+      if (play.type === 'sb'     && play.runner)   ensure(play.runner).SB++
+      if (play.type === 'error'  && play.fielder)  ensure(play.fielder).E++
       if (play.type === 'putout') {
         if (play.fielder)  ensure(play.fielder).PO++
         if (play.assister) ensure(play.assister).A++
@@ -204,10 +222,29 @@ export function computeSeasonStats() {
     }
   }
 
-  return Object.values(stats).map(s => ({
-    ...s,
-    G: s.G.size,
-    AVG: s.AB > 0 ? (s.H / s.AB).toFixed(3).replace(/^0/, '') : '.000',
-    OBP: (s.AB + s.BB) > 0 ? ((s.H + s.BB) / (s.AB + s.BB)).toFixed(3).replace(/^0/, '') : '.000',
-  })).sort((a, b) => b.AB - a.AB)
+  return Object.values(stats).map(s => {
+    const singles = s.H - s['2B'] - s['3B'] - s.HR
+    const tb = singles + s['2B'] * 2 + s['3B'] * 3 + s.HR * 4
+    return {
+      ...s,
+      G: s.G.size,
+      AVG: s.AB > 0 ? (s.H / s.AB).toFixed(3).replace(/^0/, '') : '.000',
+      OBP: (s.AB + s.BB) > 0 ? ((s.H + s.BB) / (s.AB + s.BB)).toFixed(3).replace(/^0/, '') : '.000',
+      SLG: s.AB > 0 ? (tb / s.AB).toFixed(3).replace(/^0/, '') : '.000',
+    }
+  }).sort((a, b) => b.AB - a.AB)
+}
+
+// ── Season W/L/D record ───────────────────────────────────────
+export function getSeasonRecord() {
+  const games = getGames()
+  return games.reduce(
+    (rec, g) => {
+      if (g.result === 'W') rec.W++
+      else if (g.result === 'L') rec.L++
+      else if (g.result === 'D') rec.D++
+      return rec
+    },
+    { W: 0, L: 0, D: 0 }
+  )
 }
