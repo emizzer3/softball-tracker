@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Softball" />
+    <meta name="description" content="Mixed recreational slow-pitch softball live tracker" />
+    <link rel="manifest" href="/softball-tracker/manifest.json" />
+    <link rel="apple-touch-icon" href="/softball-tracker/icon-192.png" />
+    <link rel="icon" href="/softball-tracker/icon-192.png" />
+    <title>⚾ Softball Tracker</title>
+    <style>
+      /* Safe area insets for iPhone notch */
+      .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/softball-tracker/sw.js')
+        })
+      }
+    </script>
+  </body>
+</html>
