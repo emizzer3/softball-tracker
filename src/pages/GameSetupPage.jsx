@@ -27,8 +27,11 @@ export const POSITIONS = ['P','C','1B','2B','3B','SS','LF','LC','RC','RF','EF']
 function validateOrder(order, rosterMap) {
   if (order.length < 2) return null
   for (let i = 1; i < order.length; i++) {
-    if (rosterMap[order[i]] === rosterMap[order[i - 1]]) {
-      return `${order[i - 1]} and ${order[i]} are both ${rosterMap[order[i]]} — must alternate BBH/SBH`
+    const curr = rosterMap[order[i]]
+    const prev = rosterMap[order[i - 1]]
+    // Skip unknown players (deleted from roster after draft was saved)
+    if (curr && prev && curr === prev) {
+      return `${order[i - 1]} and ${order[i]} are both ${curr} — must alternate BBH/SBH`
     }
   }
   return null

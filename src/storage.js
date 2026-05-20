@@ -182,7 +182,7 @@ export function computeSeasonStats() {
         name,
         G: new Set(), W: 0, L: 0, D: 0,
         // batting
-        AB: 0, H: 0, '1B': 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, K: 0, SB: 0,
+        AB: 0, H: 0, '1B': 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, HBP: 0, K: 0, SB: 0,
         // fielding
         PO: 0, A: 0, E: 0,
       }
@@ -192,22 +192,29 @@ export function computeSeasonStats() {
 
   for (const game of games) {
     const result = game.result // 'W' | 'L' | 'D' | undefined
+    const playersThisGame = new Set()
 
     for (const ab of (game.atBats || [])) {
       const s = ensure(ab.batter)
       s.G.add(game.id)
-      if (result === 'W') s.W++
-      else if (result === 'L') s.L++
-      else if (result === 'D') s.D++
+      playersThisGame.add(ab.batter)
 
       const outcome = ab.outcome || ''
       if (!['BB', 'HBP', 'SAC'].includes(outcome)) s.AB++
       if (['1B','2B','3B','HR'].includes(outcome)) { s.H++; s[outcome]++ }
-      if (outcome === 'BB') s.BB++
-      if (outcome === 'K')  s.K++
+      if (outcome === 'BB')  s.BB++
+      if (outcome === 'HBP') s.HBP++
+      if (outcome === 'K')   s.K++
       s.RBI += (ab.rbi || 0)
-      // Credit a run to the batter when they score (RBI on their own HR, or RBI>0 approximation)
       if (outcome === 'HR') s.R++
+    }
+
+    // W/L/D credited once per player per game (not once per at-bat)
+    for (const playerName of playersThisGame) {
+      const s = ensure(playerName)
+      if (result === 'W') s.W++
+      else if (result === 'L') s.L++
+      else if (result === 'D') s.D++
     }
 
     // runs, stolen bases, putouts, assists, errors from play log
@@ -229,7 +236,7 @@ export function computeSeasonStats() {
       ...s,
       G: s.G.size,
       AVG: s.AB > 0 ? (s.H / s.AB).toFixed(3).replace(/^0/, '') : '.000',
-      OBP: (s.AB + s.BB) > 0 ? ((s.H + s.BB) / (s.AB + s.BB)).toFixed(3).replace(/^0/, '') : '.000',
+      OBP: (s.AB + s.BB + s.HBP) > 0 ? ((s.H + s.BB + s.HBP) / (s.AB + s.BB + s.HBP)).toFixed(3).replace(/^0/, '') : '.000',
       SLG: s.AB > 0 ? (tb / s.AB).toFixed(3).replace(/^0/, '') : '.000',
     }
   }).sort((a, b) => b.AB - a.AB)

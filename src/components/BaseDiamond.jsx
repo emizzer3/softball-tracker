@@ -25,7 +25,8 @@ export default function BaseDiamond({ bases, size = 100 }) {
         stroke={bases[2] ? '#f59e0b' : '#cbd5e1'} strokeWidth={bases[2] ? 3 : 2}
         strokeDasharray={bases[2] ? '' : '4 3'} />
       <line x1={third[0]}  y1={third[1]}  x2={home[0]}   y2={home[1]}
-        stroke='#cbd5e1' strokeWidth={2} strokeDasharray='4 3' />
+        stroke={bases[2] ? '#f59e0b' : '#cbd5e1'} strokeWidth={bases[2] ? 3 : 2}
+        strokeDasharray={bases[2] ? '' : '4 3'} />
 
       {/* Bases — rotated squares at each corner */}
       {[first, second, third].map(([x, y], i) => (

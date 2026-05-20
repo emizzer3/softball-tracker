@@ -76,7 +76,7 @@ function EmptyCell() {
   )
 }
 
-export default function ScoresheetPage({ game, onHome }) {
+export default function ScoresheetPage({ game, onHome, onSummary }) {
   const { atBats = [], battingOrder = [], innings, home, away, homeScore, awayScore, inningScores = [], date, gameType, tournamentName } = game
 
   // Build grid: batters × innings
@@ -112,6 +112,9 @@ export default function ScoresheetPage({ game, onHome }) {
       <div className="flex items-center gap-2 mb-3 no-print">
         <button onClick={onHome} className="btn btn-ghost btn-sm"><Home size={14} /> Home</button>
         <h1 className="text-lg font-bold flex-1">Scoresheet</h1>
+        {onSummary && (
+          <button onClick={onSummary} className="btn btn-ghost btn-sm gap-1">📋 Summary</button>
+        )}
         <button onClick={() => window.print()} className="btn btn-primary btn-sm gap-1">
           <Printer size={14} /> Print
         </button>

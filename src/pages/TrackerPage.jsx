@@ -82,6 +82,7 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
   const [showPutout, setShowPutout] = useState(false)
   const [pendingOutCode, setPendingOutCode] = useState(null)
   const [showGuide, setShowGuide] = useState(false)
+  const [prevGs, setPrevGs] = useState(null) // snapshot for undo
 
   const batter = battingOrder[gs.batterIndex % battingOrder.length]
   const batterPosition = setup.playerPositions?.[batter]
@@ -94,8 +95,9 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
 
   // Core outcome logic — separated so it can be called with optional playLog extras
   function finishOutcome(code, extraPlayLog = []) {
+    const snapshot = { ...gs }  // full pre-action snapshot for undo
     const by = BASES_ON_OUTCOME[code] || 0
-    const isOut = ['K','F','G'].includes(code)
+    const isOut = ['K','F','G','SAC'].includes(code)
     const scoringTeam = gs.half === 'top' ? 'away' : 'home'
     const g = { ...gs, balls: 0, strikes: 0 }
 
@@ -156,6 +158,7 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
     g.batterIndex = g.done ? g.batterIndex : (g.batterIndex + 1) % battingOrder.length
 
     setLastAction(prev => ({ ...prev, code, batter, rbi: runs }))
+    setPrevGs(snapshot)
     persist(g)
   }
 
@@ -226,22 +229,11 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
   }
 
   function undoLast() {
-    if (!lastAction) return
-    setGs(prev => {
-      const g = { ...prev }
-      g.atBats = g.atBats.slice(0, -1)
-      // Also remove associated putout log entry if present
-      if (
-        g.playLog.length > 0 &&
-        g.playLog[g.playLog.length - 1].type === 'putout' &&
-        g.playLog[g.playLog.length - 1].batter === lastAction.batter
-      ) {
-        g.playLog = g.playLog.slice(0, -1)
-      }
-      g.batterIndex = Math.max(0, g.batterIndex - 1)
-      g.balls = 0; g.strikes = 0
-      return g
-    })
+    if (!prevGs || !lastAction) return
+    // Restore full pre-action state: score, bases, outs, inning, atBats, playLog, everything
+    setActiveGame({ setup, gameState: prevGs, battingOrder })
+    setGs(prevGs)
+    setPrevGs(null)
     setLastAction(null)
   }
 
