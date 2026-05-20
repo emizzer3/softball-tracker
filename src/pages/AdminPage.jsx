@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
-import { Lock, Plus, Trash2, ToggleLeft, ToggleRight, KeyRound, ChevronLeft, Trophy, Download, Upload } from 'lucide-react'
-import { getRoster, addPlayer, updatePlayer, removePlayer, checkPin, setPin, getDivision, setDivision, getTeams, addTeam, removeTeam, exportAllData, importAllData } from '../storage'
+import { Lock, Plus, Trash2, ToggleLeft, ToggleRight, KeyRound, ChevronLeft, Trophy, Download, Upload, CalendarDays } from 'lucide-react'
+import { getRoster, addPlayer, updatePlayer, removePlayer, checkPin, setPin, getDivision, setDivision, getTeams, addTeam, removeTeam, exportAllData, importAllData, getSchedule, addFixture, removeFixture } from '../storage'
 
 function PinGate({ onUnlock }) {
   const [pin, setPin] = useState('')
@@ -172,6 +172,129 @@ function LeagueSettings() {
   )
 }
 
+const GAME_TYPES_SCHEDULE = ['League', 'Friendly', 'Tournament', 'Training', 'Cup']
+
+function ScheduleSection() {
+  const [fixtures, setFixtures] = useState(getSchedule)
+  const [date, setDate]       = useState('')
+  const [opponent, setOpponent] = useState('')
+  const [time, setTime]       = useState('')
+  const [location, setLocation] = useState('')
+  const [gameType, setGameType] = useState('League')
+
+  function handleAdd(e) {
+    e.preventDefault()
+    if (!date || !opponent.trim()) return
+    setFixtures(addFixture({ date, opponent: opponent.trim(), time, location, gameType }))
+    setOpponent('')
+    setTime('')
+    setLocation('')
+    setDate('')
+    setGameType('League')
+  }
+
+  function handleRemove(id) {
+    setFixtures(removeFixture(id))
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+  const upcoming = fixtures.filter(f => f.date >= today)
+  const past     = fixtures.filter(f => f.date < today)
+
+  return (
+    <div className="card mb-4">
+      <h3 className="font-semibold mb-3 flex items-center gap-2"><CalendarDays size={18} /> Schedule / Fixtures</h3>
+      <p className="text-xs text-gray-500 mb-3">
+        Upcoming fixtures appear on the home screen. Past fixtures are kept for reference.
+      </p>
+
+      {/* Add fixture form */}
+      <form onSubmit={handleAdd} className="space-y-2 mb-4 bg-gray-50 rounded-lg p-3">
+        <p className="text-xs font-semibold text-gray-600 mb-1">Add fixture</p>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="label">Date</label>
+            <input type="date" className="input text-sm" value={date} onChange={e => setDate(e.target.value)} required />
+          </div>
+          <div className="w-24">
+            <label className="label">Time</label>
+            <input type="time" className="input text-sm" value={time} onChange={e => setTime(e.target.value)} placeholder="Optional" />
+          </div>
+        </div>
+        <div>
+          <label className="label">Opponent</label>
+          <input className="input text-sm" placeholder="e.g. Bristol Bulls" value={opponent} onChange={e => setOpponent(e.target.value)} required />
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="label">Location (optional)</label>
+            <input className="input text-sm" placeholder="e.g. Ashton Gate" value={location} onChange={e => setLocation(e.target.value)} />
+          </div>
+          <div className="w-28">
+            <label className="label">Type</label>
+            <select className="input text-sm" value={gameType} onChange={e => setGameType(e.target.value)}>
+              {GAME_TYPES_SCHEDULE.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+        <button type="submit" className="btn btn-success btn-sm w-full gap-1">
+          <Plus size={14} /> Add to Schedule
+        </button>
+      </form>
+
+      {/* Upcoming */}
+      {upcoming.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Upcoming</p>
+          <ul className="divide-y divide-gray-100">
+            {upcoming.map(f => (
+              <li key={f.id} className="flex items-center gap-2 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">
+                    vs {f.opponent}
+                    <span className="ml-2 text-xs font-normal bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{f.gameType}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(f.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {f.time ? ' · ' + f.time : ''}
+                    {f.location ? ' · ' + f.location : ''}
+                  </p>
+                </div>
+                <button onClick={() => handleRemove(f.id)} className="btn btn-ghost btn-sm p-1 text-red-400"><Trash2 size={14} /></button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Past */}
+      {past.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Past fixtures</p>
+          <ul className="divide-y divide-gray-100">
+            {past.slice().reverse().map(f => (
+              <li key={f.id} className="flex items-center gap-2 py-1.5 opacity-60">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm">vs {f.opponent}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(f.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    {f.location ? ' · ' + f.location : ''}
+                  </p>
+                </div>
+                <button onClick={() => handleRemove(f.id)} className="btn btn-ghost btn-sm p-1 text-red-400"><Trash2 size={14} /></button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {fixtures.length === 0 && (
+        <p className="text-xs text-gray-400 text-center py-2">No fixtures added yet.</p>
+      )}
+    </div>
+  )
+}
+
 function BackupSection() {
   const fileInputRef = useRef(null)
   const [importMsg, setImportMsg] = useState(null)
@@ -262,6 +385,8 @@ export default function AdminPage({ onBack }) {
       </div>
 
       <LeagueSettings />
+
+      <ScheduleSection />
 
       <AddPlayerForm onAdd={handleAdd} />
 
