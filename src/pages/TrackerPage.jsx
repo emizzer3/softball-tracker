@@ -11,13 +11,12 @@ const OUTCOMES = [
   { code: '3B', label: 'Triple',            color: 'btn-success', hit: true },
   { code: 'HR', label: 'Home Run',          color: 'btn-success', hit: true },
   { code: 'BB', label: 'Walk',              color: 'btn-primary', hit: false },
-  { code: 'HBP',label: 'HBP',              color: 'btn-primary', hit: false },
   { code: 'K',  label: 'Strikeout',         color: 'btn-danger',  hit: false },
   { code: 'F',  label: 'Flyout',            color: 'btn-danger',  hit: false },
   { code: 'G',  label: 'Groundout',         color: 'btn-danger',  hit: false },
   { code: 'E',  label: 'On Error',          color: 'btn-warning', hit: false },
   { code: 'FC', label: "Fielder's Choice",  color: 'btn-warning', hit: false },
-  { code: 'SAC',label: 'Sacrifice',         color: 'btn-ghost',   hit: false },
+  { code: 'SAC',label: 'Sac Fly',           color: 'btn-ghost',   hit: false },
 ]
 
 // Plain-English guide shown in the Outcome Guide sheet
@@ -27,17 +26,17 @@ const OUTCOME_GUIDE = [
   { code: '3B',  label: 'Triple',           desc: 'Hit the ball and safely reached 3rd base.' },
   { code: 'HR',  label: 'Home Run',         desc: 'Hit over/to the fence — batter runs all bases and scores.' },
   { code: 'BB',  label: 'Walk',             desc: 'Pitcher threw 4 balls — batter walks to 1st. Doesn\'t count as an at-bat.' },
-  { code: 'HBP', label: 'Hit By Pitch',     desc: 'Ball hit the batter — free base. Doesn\'t count as an at-bat.' },
   { code: 'K',   label: 'Strikeout',        desc: '3 strikes and the batter is out. Catcher auto-gets the putout (PO).' },
   { code: 'F',   label: 'Flyout',           desc: 'Batter hit the ball in the air and a fielder caught it before it bounced.' },
   { code: 'G',   label: 'Groundout',        desc: 'Batter hit a ground ball and was thrown out at first (or another base).' },
   { code: 'E',   label: 'On Error',         desc: 'Batter reached base because a fielder made a mistake. Doesn\'t count as a hit.' },
   { code: 'FC',  label: "Fielder's Choice", desc: 'Batter reached safely, but the fielder chose to put out a different runner instead.' },
-  { code: 'SAC', label: 'Sacrifice',        desc: 'Batter was put out on a fly ball or bunt, but a runner scored or advanced.' },
+  { code: 'SAC', label: 'Sacrifice Fly',    desc: 'Batter hits a fly ball and is caught (out), but a runner tags up and scores. Doesn\'t count as an at-bat.' },
 ]
 
 const BASES_ON_OUTCOME = {
-  '1B': 1, '2B': 2, '3B': 3, 'HR': 4, 'BB': 1, 'HBP': 1, 'E': 1, 'FC': 1,
+  '1B': 1, '2B': 2, '3B': 3, 'HR': 4, 'BB': 1, 'E': 1, 'FC': 1,
+  'SAC': 1, // sacrifice fly — runners advance 1 (runner on 3rd scores), batter is out
 }
 
 function initState(setup) {
@@ -118,8 +117,8 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       const [advanced, r] = basesAdvanced(newBases, by)
       runs = r
       newBases = advanced
-      if (by < 4) newBases[by - 1] = true  // batter stops on base
-      else runs++                            // HR: batter scores too
+      if (by === 4) runs++                        // HR: batter scores too
+      else if (!isOut) newBases[by - 1] = true    // batter stops on base (not for SAC/outs)
     }
 
     const atBat = {
@@ -138,13 +137,30 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       g.playLog = [...g.playLog, ...extraPlayLog]
     }
 
+    // Score runs regardless of whether the batter was out (covers SAC fly, etc.)
+    if (runs > 0) {
+      if (scoringTeam === 'home') g.homeScore += runs
+      else g.awayScore += runs
+      const scores = [...g.inningScores]
+      scores[g.inning - 1] = {
+        ...scores[g.inning - 1],
+        [scoringTeam]: (scores[g.inning - 1][scoringTeam] || 0) + runs,
+      }
+      g.inningScores = scores
+    }
+
     if (isOut) {
       g.outs++
       if (g.outs >= 3) {
         newBases = [false, false, false]
         g.outs = 0
         if (g.half === 'top') {
-          g.half = 'bottom'
+          // Walk-off: if home team already leads at end of last top inning, skip bottom
+          if (g.inning >= setup.innings && g.homeScore > g.awayScore) {
+            g.done = true
+          } else {
+            g.half = 'bottom'
+          }
         } else {
           if (g.inning >= setup.innings) {
             g.done = true
@@ -154,15 +170,11 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
           }
         }
       }
-    } else {
-      if (scoringTeam === 'home') g.homeScore += runs
-      else g.awayScore += runs
-      const scores = [...g.inningScores]
-      scores[g.inning - 1] = {
-        ...scores[g.inning - 1],
-        [scoringTeam]: (scores[g.inning - 1][scoringTeam] || 0) + runs,
-      }
-      g.inningScores = scores
+    }
+
+    // Walk-off mid-inning: home team takes the lead in the bottom of the last inning
+    if (!g.done && g.half === 'bottom' && g.inning >= setup.innings && g.homeScore > g.awayScore) {
+      g.done = true
     }
 
     g.bases = newBases
@@ -276,8 +288,12 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       g.bases = [false, false, false]
       g.outs = 0
       if (weAreHome) {
-        // We're home, fielding top (away batting) — 3 outs ends top, start our bottom
-        g.half = 'bottom'
+        // Walk-off: if we're home and leading at end of last top inning, no need to bat
+        if (g.inning >= setup.innings && g.homeScore > g.awayScore) {
+          g.done = true
+        } else {
+          g.half = 'bottom'
+        }
       } else {
         // We're away, fielding bottom (home batting) — 3 outs ends inning
         if (g.inning >= setup.innings) {
@@ -301,6 +317,10 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     const scores = [...g.inningScores]
     scores[g.inning - 1] = { ...scores[g.inning - 1], [opponentSide]: (scores[g.inning - 1][opponentSide] || 0) + 1 }
     g.inningScores = scores
+    // Walk-off: home opponent takes the lead in the bottom of the last inning
+    if (!weAreHome && g.half === 'bottom' && g.inning >= setup.innings && g.homeScore > g.awayScore) {
+      g.done = true
+    }
     persist(g)
   }
 

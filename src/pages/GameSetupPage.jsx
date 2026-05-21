@@ -26,12 +26,12 @@ export const POSITIONS = ['P','C','1B','2B','3B','SS','LF','LC','RC','RF','EF']
 
 function validateOrder(order, rosterMap) {
   if (order.length < 2) return null
-  for (let i = 1; i < order.length; i++) {
+  // Check every consecutive pair including the wrap-around (last → first)
+  for (let i = 0; i < order.length; i++) {
     const curr = rosterMap[order[i]]
-    const prev = rosterMap[order[i - 1]]
-    // Skip unknown players (deleted from roster after draft was saved)
-    if (curr && prev && curr === prev) {
-      return `${order[i - 1]} and ${order[i]} are both ${curr} — must alternate BBH/SBH`
+    const next = rosterMap[order[(i + 1) % order.length]]
+    if (curr && next && curr === next) {
+      return `${order[i]} and ${order[(i + 1) % order.length]} are both ${curr} — must alternate BBH/SBH`
     }
   }
   return null
@@ -337,7 +337,8 @@ export default function GameSetupPage({ onStart, onBack }) {
                 <ul className="space-y-1 mb-3">
                   {order.map((name, i) => {
                     const type = rosterMap[name]
-                    const clash = i > 0 && rosterMap[order[i-1]] === type
+                    const prevIdx = (i + order.length - 1) % order.length
+                    const clash = order.length > 1 && rosterMap[order[prevIdx]] === type
                     return (
                       <SortableOrderItem key={name} id={name} index={i} type={type} clash={clash} />
                     )

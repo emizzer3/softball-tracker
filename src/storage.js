@@ -182,7 +182,7 @@ export function computeSeasonStats() {
         name,
         G: new Set(), W: 0, L: 0, D: 0,
         // batting
-        AB: 0, H: 0, '1B': 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, HBP: 0, K: 0,
+        AB: 0, H: 0, '1B': 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, K: 0,
         // fielding
         PO: 0, A: 0, E: 0,
       }
@@ -203,7 +203,6 @@ export function computeSeasonStats() {
       if (!['BB', 'HBP', 'SAC'].includes(outcome)) s.AB++
       if (['1B','2B','3B','HR'].includes(outcome)) { s.H++; s[outcome]++ }
       if (outcome === 'BB')  s.BB++
-      if (outcome === 'HBP') s.HBP++
       if (outcome === 'K')   s.K++
       s.RBI += (ab.rbi || 0)
       if (outcome === 'HR') s.R++
@@ -235,7 +234,7 @@ export function computeSeasonStats() {
       ...s,
       G: s.G.size,
       AVG: s.AB > 0 ? (s.H / s.AB).toFixed(3).replace(/^0/, '') : '.000',
-      OBP: (s.AB + s.BB + s.HBP) > 0 ? ((s.H + s.BB + s.HBP) / (s.AB + s.BB + s.HBP)).toFixed(3).replace(/^0/, '') : '.000',
+      OBP: (s.AB + s.BB) > 0 ? ((s.H + s.BB) / (s.AB + s.BB)).toFixed(3).replace(/^0/, '') : '.000',
       SLG: s.AB > 0 ? (tb / s.AB).toFixed(3).replace(/^0/, '') : '.000',
     }
   }).sort((a, b) => b.AB - a.AB)

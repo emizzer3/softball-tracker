@@ -13,7 +13,7 @@ const STAT_TIPS = {
   BB:   { label: 'Walks',           desc: 'Times the pitcher threw 4 balls — batter walked to first base.' },
   K:    { label: 'Strikeouts',      desc: 'Times the batter got 3 strikes and was called out.' },
   AVG:  { label: 'Batting Average', desc: 'Hits ÷ At Bats. A .300 average means getting a hit 30% of the time. League average is typically .250.' },
-  OBP:  { label: 'On-Base %',       desc: '(Hits + Walks) ÷ (At Bats + Walks). How often the batter gets on base by any means. .350+ is great.' },
+  OBP:  { label: 'On-Base %',       desc: 'Hits + Walks ÷ (At Bats + Walks). How often the batter gets on base. .350+ is great.' },
   SLG:  { label: 'Slugging %',      desc: 'Total bases ÷ At Bats. Measures hitting power. A single = 1 base, double = 2, triple = 3, HR = 4.' },
   PO:   { label: 'Putouts',         desc: 'Outs the fielder directly recorded — catching a fly ball, tagging a runner, or receiving a throw at base.' },
   A:    { label: 'Assists',         desc: 'Times the fielder threw the ball to help get a runner out.' },
@@ -158,7 +158,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                   ))}
                 </tbody>
               </table>
-              <p className="text-xs text-gray-400 mt-2">AVG = hits/AB · OBP = (H+BB)/(AB+BB) · SLG = total bases/AB</p>
+              <p className="text-xs text-gray-400 mt-2">AVG = H/AB · OBP = (H+BB)/(AB+BB) · SLG = total bases/AB</p>
             </div>
           )}
 
