@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RotateCcw, ArrowRight, Users, MapPin, AlertTriangle, BookOpen, X, StopCircle } from 'lucide-react'
+import { RotateCcw, Users, MapPin, AlertTriangle, BookOpen, X, StopCircle } from 'lucide-react'
 import BaseDiamond from '../components/BaseDiamond'
 import { setActiveGame, getRoster } from '../storage'
 
@@ -200,27 +200,6 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
       if (g.strikes === 2) { applyOutcome('K'); return }
       g.strikes++
     }
-    persist(g)
-  }
-
-  function addStolenBase(baseIndex) {
-    const g = { ...gs }
-    const newBases = [...g.bases]
-    if (!newBases[baseIndex]) return
-    newBases[baseIndex] = false
-    let runs = 0
-    if (baseIndex === 2) runs = 1 // scored from 3rd
-    else newBases[baseIndex + 1] = true
-
-    if (runs > 0) {
-      const scoringTeam = g.half === 'top' ? 'away' : 'home'
-      if (scoringTeam === 'home') g.homeScore += runs
-      else g.awayScore += runs
-    }
-
-    // 'runner' key matches what computeSeasonStats expects
-    g.playLog = [...g.playLog, { type: 'sb', runner: batter, inning: g.inning, half: g.half }]
-    g.bases = newBases
     persist(g)
   }
 
@@ -498,21 +477,6 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
           </div>
         </details>
       )}
-
-      {/* Stolen base */}
-      <div className="card mb-3 p-3">
-        <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
-          <ArrowRight size={12} /> STOLEN BASE — tap the base being stolen
-        </p>
-        <div className="flex gap-2">
-          {['1st→2nd', '2nd→3rd', '3rd→Home'].map((label, i) => (
-            <button key={i} onClick={() => addStolenBase(i)} disabled={!gs.bases[i]}
-              className="btn btn-outline btn-sm flex-1 disabled:opacity-30">
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Secondary actions */}
       <div className="grid grid-cols-2 gap-2 mb-3">

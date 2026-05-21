@@ -182,7 +182,7 @@ export function computeSeasonStats() {
         name,
         G: new Set(), W: 0, L: 0, D: 0,
         // batting
-        AB: 0, H: 0, '1B': 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, HBP: 0, K: 0, SB: 0,
+        AB: 0, H: 0, '1B': 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, HBP: 0, K: 0,
         // fielding
         PO: 0, A: 0, E: 0,
       }
@@ -220,7 +220,6 @@ export function computeSeasonStats() {
     // runs, stolen bases, putouts, assists, errors from play log
     for (const play of (game.playLog || [])) {
       if (play.type === 'run'    && play.player)   ensure(play.player).R++
-      if (play.type === 'sb'     && play.runner)   ensure(play.runner).SB++
       if (play.type === 'error'  && play.fielder)  ensure(play.fielder).E++
       if (play.type === 'putout') {
         if (play.fielder)  ensure(play.fielder).PO++

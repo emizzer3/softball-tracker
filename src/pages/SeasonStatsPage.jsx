@@ -12,7 +12,6 @@ const STAT_TIPS = {
   RBI:  { label: 'Runs Batted In',  desc: 'Runs that scored because of this batter\'s hit. Includes runners on base when you hit.' },
   BB:   { label: 'Walks',           desc: 'Times the pitcher threw 4 balls — batter walked to first base.' },
   K:    { label: 'Strikeouts',      desc: 'Times the batter got 3 strikes and was called out.' },
-  SB:   { label: 'Stolen Bases',    desc: 'Times a runner advanced a base without the ball being hit.' },
   AVG:  { label: 'Batting Average', desc: 'Hits ÷ At Bats. A .300 average means getting a hit 30% of the time. League average is typically .250.' },
   OBP:  { label: 'On-Base %',       desc: '(Hits + Walks) ÷ (At Bats + Walks). How often the batter gets on base by any means. .350+ is great.' },
   SLG:  { label: 'Slugging %',      desc: 'Total bases ÷ At Bats. Measures hitting power. A single = 1 base, double = 2, triple = 3, HR = 4.' },
@@ -33,7 +32,7 @@ function StatGuideSheet({ onClose }) {
           <div>
             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1.5">Batting</p>
             <div className="space-y-2">
-              {['G','AB','H','2B','3B','HR','RBI','BB','K','SB','AVG','OBP','SLG'].map(k => (
+              {['G','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG'].map(k => (
                 <div key={k} className="flex gap-3 items-start">
                   <span className="shrink-0 w-10 text-center font-black text-xs bg-gray-100 text-gray-700 px-1 py-0.5 rounded">{k}</span>
                   <div>
@@ -136,7 +135,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    {['Player','G','AB','H','2B','3B','HR','RBI','BB','K','SB','AVG','OBP','SLG'].map(h => (
+                    {['Player','G','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG'].map(h => (
                       <th key={h} className={`py-1 font-semibold whitespace-nowrap ${
                         h === 'Player' ? 'text-left px-1 text-gray-500' :
                         ['AVG','OBP','SLG'].includes(h) ? 'text-center px-0.5 text-indigo-500' :
@@ -149,7 +148,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                   {stats.map(p => (
                     <tr key={p.name} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-1.5 px-1 font-medium whitespace-nowrap">{p.name}</td>
-                      {[p.G, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K, p.SB].map((v, i) => (
+                      {[p.G, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
                         <td key={i} className="py-1.5 px-0.5 text-center">{v}</td>
                       ))}
                       <td className="py-1.5 px-0.5 text-center text-indigo-600 font-medium">{p.AVG}</td>
