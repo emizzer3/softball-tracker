@@ -278,6 +278,14 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
     persist(g)
   }
 
+  function toggleOpponentBase(i) {
+    const g = { ...gs }
+    const newBases = [...g.bases]
+    newBases[i] = !newBases[i]
+    g.bases = newBases
+    persist(g)
+  }
+
   function callGameEarly() {
     if (!confirm('Call game early? The current score will be saved as the final result.')) return
     const g = { ...gs, done: true }
@@ -369,28 +377,44 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
       {/* Diamond + count */}
       <div className="card mb-3 flex items-center gap-4 justify-center p-4">
         <BaseDiamond bases={gs.bases} size={120} />
-        <div className="space-y-2">
-          <div>
-            <p className="text-xs text-gray-500 font-semibold">BALLS</p>
-            <div className="flex gap-1">
-              {[0,1,2,3].map(i => (
-                <div key={i} className={`w-5 h-5 rounded-full border-2 ${i < gs.balls ? 'bg-green-500 border-green-600' : 'border-gray-300'}`} />
-              ))}
+        {isOurBatting ? (
+          <div className="space-y-2">
+            <div>
+              <p className="text-xs text-gray-500 font-semibold">BALLS</p>
+              <div className="flex gap-1">
+                {[0,1,2,3].map(i => (
+                  <div key={i} className={`w-5 h-5 rounded-full border-2 ${i < gs.balls ? 'bg-green-500 border-green-600' : 'border-gray-300'}`} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 font-semibold">STRIKES</p>
+              <div className="flex gap-1">
+                {[0,1,2].map(i => (
+                  <div key={i} className={`w-5 h-5 rounded-full border-2 ${i < gs.strikes ? 'bg-red-500 border-red-600' : 'border-gray-300'}`} />
+                ))}
+              </div>
+            </div>
+            <div className="text-center">
+              <button onClick={() => addCount('ball')} className="btn btn-ghost btn-sm me-1">+Ball</button>
+              <button onClick={() => addCount('strike')} className="btn btn-ghost btn-sm">+Strike</button>
             </div>
           </div>
-          <div>
-            <p className="text-xs text-gray-500 font-semibold">STRIKES</p>
-            <div className="flex gap-1">
-              {[0,1,2].map(i => (
-                <div key={i} className={`w-5 h-5 rounded-full border-2 ${i < gs.strikes ? 'bg-red-500 border-red-600' : 'border-gray-300'}`} />
-              ))}
-            </div>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-xs text-gray-500 font-semibold text-center mb-2">RUNNERS ON BASE</p>
+            {['1st', '2nd', '3rd'].map((label, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => toggleOpponentBase(i)}
+                className={`btn btn-sm w-full ${gs.bases[i] ? 'btn-warning' : 'btn-ghost'}`}
+              >
+                {gs.bases[i] ? '🟡' : '○'} {label}
+              </button>
+            ))}
           </div>
-          <div className="text-center">
-            <button onClick={() => addCount('ball')} className="btn btn-ghost btn-sm me-1">+Ball</button>
-            <button onClick={() => addCount('strike')} className="btn btn-ghost btn-sm">+Strike</button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ── FIELDING HALF (opponents batting) ───────────────────── */}
