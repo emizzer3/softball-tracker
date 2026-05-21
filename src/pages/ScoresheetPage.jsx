@@ -1,6 +1,57 @@
 import { Printer, Home } from 'lucide-react'
+import { useState } from 'react'
 
 const POSITIONS = ['P','C','1B','2B','3B','SS','LF','LC','RC','RF','EF']
+
+// ── Spray chart ───────────────────────────────────────────────────────────────
+const SPRAY_COLORS = {
+  '1B': '#22c55e', '2B': '#16a34a', '3B': '#15803d', 'HR': '#052e16',
+  'F':  '#ef4444', 'G':  '#dc2626', 'SAC': '#f97316',
+  'E':  '#f59e0b', 'FC': '#d97706',
+}
+const FW = 280, FH = 260
+const FH_PT = [140, 250]
+const F1B = [210, 180], F2B = [140, 151], F3B = [70, 180]
+const FLF = [9, 119], FRF = [271, 119]
+
+function SprayChart({ atBats, highlightBatter }) {
+  const dots = atBats.filter(ab => ab.hitLocation)
+  return (
+    <svg viewBox={`0 0 ${FW} ${FH}`} className="w-full">
+      {/* Outfield grass */}
+      <path d={`M ${FH_PT[0]},${FH_PT[1]} L ${FLF[0]},${FLF[1]} A 185,185 0 0,1 ${FRF[0]},${FRF[1]} Z`} fill="#86efac" opacity="0.35" />
+      {/* Infield dirt */}
+      <circle cx={140} cy={200} r={73} fill="#d4a264" opacity="0.3" />
+      {/* Foul lines */}
+      <line x1={FH_PT[0]} y1={FH_PT[1]} x2={FLF[0]} y2={FLF[1]} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 3" />
+      <line x1={FH_PT[0]} y1={FH_PT[1]} x2={FRF[0]} y2={FRF[1]} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 3" />
+      {/* Outfield arc */}
+      <path d={`M ${FLF[0]},${FLF[1]} A 185,185 0 0,1 ${FRF[0]},${FRF[1]}`} fill="none" stroke="#94a3b8" strokeWidth={1.5} />
+      {/* Base paths */}
+      <line x1={FH_PT[0]} y1={FH_PT[1]} x2={F1B[0]} y2={F1B[1]} stroke="#475569" strokeWidth={1.5} />
+      <line x1={F1B[0]} y1={F1B[1]} x2={F2B[0]} y2={F2B[1]} stroke="#475569" strokeWidth={1.5} />
+      <line x1={F2B[0]} y1={F2B[1]} x2={F3B[0]} y2={F3B[1]} stroke="#475569" strokeWidth={1.5} />
+      <line x1={F3B[0]} y1={F3B[1]} x2={FH_PT[0]} y2={FH_PT[1]} stroke="#475569" strokeWidth={1.5} />
+      {/* Pitcher's mound */}
+      <circle cx={140} cy={200} r={9} fill="#c9a87c" stroke="#a07840" strokeWidth={1} />
+      {/* Bases */}
+      {[F1B, F2B, F3B].map(([bx, by], i) => (
+        <rect key={i} x={bx-6} y={by-6} width={12} height={12} transform={`rotate(45,${bx},${by})`} fill="white" stroke="#475569" strokeWidth={1.5} />
+      ))}
+      {/* Home plate */}
+      <polygon points={`${FH_PT[0]},${FH_PT[1]-9} ${FH_PT[0]-8},${FH_PT[1]-3} ${FH_PT[0]-6},${FH_PT[1]+7} ${FH_PT[0]+6},${FH_PT[1]+7} ${FH_PT[0]+8},${FH_PT[1]-3}`} fill="#64748b" />
+      {/* Hit dots */}
+      {dots.map(ab => {
+        const dimmed = highlightBatter && ab.batter !== highlightBatter
+        return (
+          <g key={ab.id} opacity={dimmed ? 0.2 : 0.85}>
+            <circle cx={ab.hitLocation.x} cy={ab.hitLocation.y} r={8} fill={SPRAY_COLORS[ab.outcome] || '#6b7280'} stroke="white" strokeWidth={1.5} />
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
 
 // Outcome codes → how many bases the batter reached (for diamond fill)
 const BASES_REACHED = { '1B': 1, '2B': 2, '3B': 3, 'HR': 4, 'BB': 1, 'HBP': 1, 'E': 1, 'FC': 1 }
@@ -230,6 +281,43 @@ export default function ScoresheetPage({ game, onHome, onSummary }) {
           })()}
         </table>
       </div>
+
+      {/* Spray chart */}
+      {atBats.some(ab => ab.hitLocation) && (() => {
+        const [activeBatter, setActiveBatter] = useState(null)
+        const battersWithLocs = [...new Set(atBats.filter(ab => ab.hitLocation).map(ab => ab.batter))]
+        return (
+          <div className="card p-3 mb-4 no-print">
+            <h2 className="font-bold text-sm mb-1">📍 Spray Chart</h2>
+            <p className="text-xs text-gray-400 mb-2">Tap a player to highlight their hits</p>
+            {/* Player filter chips */}
+            <div className="flex flex-wrap gap-1 mb-3">
+              <button
+                onClick={() => setActiveBatter(null)}
+                className={`btn btn-sm text-xs py-0.5 ${!activeBatter ? 'btn-primary' : 'btn-ghost'}`}
+              >All</button>
+              {battersWithLocs.map(name => (
+                <button key={name}
+                  onClick={() => setActiveBatter(prev => prev === name ? null : name)}
+                  className={`btn btn-sm text-xs py-0.5 ${activeBatter === name ? 'btn-primary' : 'btn-ghost'}`}
+                >{name.split(' ')[0]}</button>
+              ))}
+            </div>
+            <div className="rounded-xl overflow-hidden border border-gray-200 bg-green-900/10">
+              <SprayChart atBats={atBats} highlightBatter={activeBatter} />
+            </div>
+            {/* Legend */}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+              {[['#22c55e','1B'],['#16a34a','2B/3B'],['#052e16','HR'],['#ef4444','Out'],['#f59e0b','E/FC']].map(([c,l]) => (
+                <span key={l} className="flex items-center gap-1 text-xs text-gray-500">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: c }} />
+                  {l}
+                </span>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Fielding card */}
       {game.fieldingLineup && Object.keys(game.fieldingLineup).length > 0 && (() => {

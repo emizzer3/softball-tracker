@@ -83,6 +83,9 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   const [pendingOutCode, setPendingOutCode] = useState(null)
   const [showGuide, setShowGuide] = useState(false)
   const [prevGs, setPrevGs] = useState(null) // snapshot for undo
+  const [showHitLoc, setShowHitLoc] = useState(false)
+  const [pendingHitCode, setPendingHitCode] = useState(null)
+  const [pendingHitLoc, setPendingHitLoc] = useState(null)
 
   // weAreHome defaults true for any games saved before this field existed
   const weAreHome = setup.weAreHome !== false
@@ -97,8 +100,11 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     setGs(newGs)
   }
 
+  // Ball-in-play outcomes that prompt for a hit location
+  const BALL_IN_PLAY = ['1B','2B','3B','HR','F','G','E','FC','SAC']
+
   // Core outcome logic — separated so it can be called with optional playLog extras
-  function finishOutcome(code, extraPlayLog = []) {
+  function finishOutcome(code, extraPlayLog = [], hitLocation = null) {
     const snapshot = { ...gs }  // full pre-action snapshot for undo
     const by = BASES_ON_OUTCOME[code] || 0
     const isOut = ['K','F','G','SAC'].includes(code)
@@ -124,6 +130,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       outcome: code,
       rbi: runs,
       bases: [...newBases],
+      hitLocation: hitLocation || null,
     }
     g.atBats = [...g.atBats, atBat]
 
@@ -167,7 +174,12 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   }
 
   function applyOutcome(code) {
-    if (code === 'K') {
+    if (isOurBatting && BALL_IN_PLAY.includes(code)) {
+      // Show hit location first, then proceed to putout modal (G/F) or finish
+      setPendingHitCode(code)
+      setPendingHitLoc(null)
+      setShowHitLoc(true)
+    } else if (code === 'K') {
       const catcher = setup.fieldingLineup?.['C']
       const extraLog = catcher
         ? [{ type: 'putout', fielder: catcher, assister: null, inning: gs.inning, half: gs.half, outCode: code, batter }]
@@ -183,13 +195,32 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     }
   }
 
+  // Called when user confirms (or skips) the hit location modal
+  function confirmHitLocation(location) {
+    setShowHitLoc(false)
+    const code = pendingHitCode
+    setPendingHitCode(null)
+    setPendingHitLoc(location)
+
+    if (code === 'G' || code === 'F') {
+      // Still need fielder attribution after location
+      setPendingOutCode(code)
+      setShowPutout(true)
+    } else {
+      setLastAction({ code, batter, rbi: 0, fielder: null, assister: null, autoFielder: null })
+      finishOutcome(code, [], location)
+      setPendingHitLoc(null)
+    }
+  }
+
   function completePutout(fielder, assister) {
     const extraLog = fielder
       ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter }]
       : []
     setLastAction({ code: pendingOutCode, batter, rbi: 0, fielder: fielder || null, assister: assister || null, autoFielder: null })
-    finishOutcome(pendingOutCode, extraLog)
+    finishOutcome(pendingOutCode, extraLog, pendingHitLoc)
     setPendingOutCode(null)
+    setPendingHitLoc(null)
     setShowPutout(false)
   }
 
@@ -545,6 +576,16 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
         />
       )}
 
+      {/* Hit location modal */}
+      {showHitLoc && (
+        <HitLocationModal
+          batter={batter}
+          outcomeCode={pendingHitCode}
+          onConfirm={confirmHitLocation}
+          onSkip={() => confirmHitLocation(null)}
+        />
+      )}
+
       {/* Outcome guide sheet */}
       {showGuide && (
         <OutcomeGuideSheet onClose={() => setShowGuide(false)} />
@@ -850,6 +891,135 @@ function FieldingModal({ battingOrder, setupLineup, existing, inningKey, positio
           <button onClick={onClose} className="btn btn-ghost btn-md flex-1">Cancel</button>
           <button onClick={() => onSave(inningKey, assignments)} className="btn btn-success btn-md flex-1">
             Save Positions
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Softball field SVG ────────────────────────────────────────────────────────
+// viewBox 280×260  home plate at (140, 250)
+const FIELD_W = 280, FIELD_H = 260
+const FIELD_HOME = [140, 250]
+const FIELD_FIRST  = [210, 180]
+const FIELD_SECOND = [140, 151]
+const FIELD_THIRD  = [70,  180]
+const FIELD_LF = [9,   119]   // left foul line end  (r≈185 at 45° from home)
+const FIELD_RF = [271, 119]   // right foul line end
+
+const HIT_COLORS = {
+  '1B': '#22c55e', '2B': '#16a34a', '3B': '#15803d', 'HR': '#14532d',
+  'F': '#ef4444', 'G': '#dc2626', 'SAC': '#f97316',
+  'E': '#f59e0b', 'FC': '#f59e0b',
+}
+
+export function SoftballField({ atBats = [], onLocationSelect, size = 280 }) {
+  const [loc, setLoc] = useState(null)
+
+  function handleClick(e) {
+    if (!onLocationSelect) return
+    const svg = e.currentTarget
+    const rect = svg.getBoundingClientRect()
+    // Convert screen coords → SVG viewBox coords
+    const svgX = ((e.clientX - rect.left)  / rect.width)  * FIELD_W
+    const svgY = ((e.clientY - rect.top)   / rect.height) * FIELD_H
+    const pt = { x: Math.round(svgX), y: Math.round(svgY) }
+    setLoc(pt)
+    onLocationSelect(pt)
+  }
+
+  const displayLoc = loc   // local preview dot while placing
+
+  return (
+    <svg
+      viewBox={`0 0 ${FIELD_W} ${FIELD_H}`}
+      width={size}
+      className="w-full"
+      style={{ cursor: onLocationSelect ? 'crosshair' : 'default', touchAction: 'none' }}
+      onClick={handleClick}
+    >
+      {/* Outfield grass wedge */}
+      <path
+        d={`M ${FIELD_HOME[0]},${FIELD_HOME[1]} L ${FIELD_LF[0]},${FIELD_LF[1]} A 185,185 0 0,1 ${FIELD_RF[0]},${FIELD_RF[1]} Z`}
+        fill="#86efac" opacity="0.35"
+      />
+      {/* Infield dirt */}
+      <circle cx={140} cy={200} r={73} fill="#d4a264" opacity="0.3" />
+      {/* Foul lines */}
+      <line x1={FIELD_HOME[0]} y1={FIELD_HOME[1]} x2={FIELD_LF[0]} y2={FIELD_LF[1]} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 3" />
+      <line x1={FIELD_HOME[0]} y1={FIELD_HOME[1]} x2={FIELD_RF[0]} y2={FIELD_RF[1]} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 3" />
+      {/* Outfield fence arc */}
+      <path d={`M ${FIELD_LF[0]},${FIELD_LF[1]} A 185,185 0 0,1 ${FIELD_RF[0]},${FIELD_RF[1]}`}
+        fill="none" stroke="#94a3b8" strokeWidth={1.5} />
+      {/* Base paths */}
+      <line x1={FIELD_HOME[0]} y1={FIELD_HOME[1]} x2={FIELD_FIRST[0]}  y2={FIELD_FIRST[1]}  stroke="#475569" strokeWidth={1.5} />
+      <line x1={FIELD_FIRST[0]}  y1={FIELD_FIRST[1]}  x2={FIELD_SECOND[0]} y2={FIELD_SECOND[1]} stroke="#475569" strokeWidth={1.5} />
+      <line x1={FIELD_SECOND[0]} y1={FIELD_SECOND[1]} x2={FIELD_THIRD[0]}  y2={FIELD_THIRD[1]}  stroke="#475569" strokeWidth={1.5} />
+      <line x1={FIELD_THIRD[0]}  y1={FIELD_THIRD[1]}  x2={FIELD_HOME[0]}   y2={FIELD_HOME[1]}   stroke="#475569" strokeWidth={1.5} />
+      {/* Pitcher's mound */}
+      <circle cx={140} cy={200} r={9} fill="#c9a87c" stroke="#a07840" strokeWidth={1} />
+      {/* Bases */}
+      {[FIELD_FIRST, FIELD_SECOND, FIELD_THIRD].map(([bx, by], i) => (
+        <rect key={i} x={bx-6} y={by-6} width={12} height={12}
+          transform={`rotate(45,${bx},${by})`}
+          fill="white" stroke="#475569" strokeWidth={1.5} />
+      ))}
+      {/* Home plate */}
+      <polygon
+        points={`${FIELD_HOME[0]},${FIELD_HOME[1]-9} ${FIELD_HOME[0]-8},${FIELD_HOME[1]-3} ${FIELD_HOME[0]-6},${FIELD_HOME[1]+7} ${FIELD_HOME[0]+6},${FIELD_HOME[1]+7} ${FIELD_HOME[0]+8},${FIELD_HOME[1]-3}`}
+        fill="#64748b"
+      />
+      {/* Saved hit location dots from previous at-bats */}
+      {atBats.filter(ab => ab.hitLocation).map(ab => (
+        <g key={ab.id}>
+          <circle cx={ab.hitLocation.x} cy={ab.hitLocation.y} r={7}
+            fill={HIT_COLORS[ab.outcome] || '#6b7280'} opacity={0.7} stroke="white" strokeWidth={1.5} />
+        </g>
+      ))}
+      {/* Current placement preview */}
+      {displayLoc && (
+        <g>
+          <circle cx={displayLoc.x} cy={displayLoc.y} r={10} fill="rgba(239,68,68,0.25)" />
+          <circle cx={displayLoc.x} cy={displayLoc.y} r={5}  fill="#ef4444" stroke="white" strokeWidth={2} />
+        </g>
+      )}
+    </svg>
+  )
+}
+
+// ── Hit location modal ────────────────────────────────────────────────────────
+function HitLocationModal({ batter, outcomeCode, onConfirm, onSkip }) {
+  const [location, setLocation] = useState(null)
+  const isHit = ['1B','2B','3B','HR'].includes(outcomeCode)
+  const label = isHit ? 'Where did the ball land?' : 'Where was the ball hit?'
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+      <div className="bg-white rounded-t-2xl w-full p-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-bold">{label}</h3>
+          <span className={`font-black text-sm px-2 py-0.5 rounded text-white`}
+            style={{ background: HIT_COLORS[outcomeCode] || '#6b7280' }}>
+            {outcomeCode}
+          </span>
+        </div>
+        <p className="text-sm text-gray-600 mb-1 font-medium">{batter}</p>
+        <p className="text-xs text-gray-400 mb-3">Tap the field to mark the location · tap again to move it</p>
+
+        <div className="rounded-xl overflow-hidden border border-gray-200 bg-green-900/10 mb-4">
+          <SoftballField onLocationSelect={setLocation} />
+        </div>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onSkip} className="btn btn-ghost btn-md flex-1">Skip</button>
+          <button
+            type="button"
+            onClick={() => onConfirm(location)}
+            disabled={!location}
+            className={`btn btn-md flex-1 ${location ? 'btn-success' : 'btn-ghost opacity-50'}`}
+          >
+            {location ? '✓ Save Location' : 'Tap field first'}
           </button>
         </div>
       </div>
