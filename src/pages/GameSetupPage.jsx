@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { CheckCircle, Circle, AlertCircle, ChevronLeft, GripVertical } from 'lucide-react'
+import { CheckCircle, Circle, AlertCircle, ChevronLeft, GripVertical, X } from 'lucide-react'
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -39,7 +39,6 @@ function validateOrder(order, rosterMap) {
 
 export default function GameSetupPage({ onStart, onBack }) {
   const roster = useMemo(() => getRoster().filter(p => p.active), [])
-  const rosterMap = useMemo(() => Object.fromEntries(roster.map(p => [p.name, p.type])), [roster])
   const teams = useMemo(() => [...getTeams(), 'Other'], [])
   const division = useMemo(() => getDivision(), [])
   const pastTournaments = useMemo(() => getTournaments(), [])
@@ -61,32 +60,48 @@ export default function GameSetupPage({ onStart, onBack }) {
   const [detailsOk,      setDetailsOk]      = useState(() => draft?.detailsOk     ?? false)
   const [detailsErr,     setDetailsErr]     = useState('')
 
-  // Step 2
-  const [selected,   setSelected]   = useState(() => draft?.selected   ?? [])
-  const [playersOk,  setPlayersOk]  = useState(() => draft?.playersOk  ?? false)
-  const [playersErr, setPlayersErr] = useState('')
+  // Step 2 — players + ringers
+  const [selected,    setSelected]    = useState(() => draft?.selected    ?? [])
+  const [ringers,     setRingers]     = useState(() => draft?.ringers     ?? [])
+  const [ringerName,  setRingerName]  = useState('')
+  const [ringerType,  setRingerType]  = useState('BBH')
+  const [playersOk,   setPlayersOk]   = useState(() => draft?.playersOk   ?? false)
+  const [playersErr,  setPlayersErr]  = useState('')
 
   // Step 3
   const [order,    setOrder]    = useState(() => draft?.order    ?? [])
   const [orderOk,  setOrderOk]  = useState(() => draft?.orderOk  ?? false)
   const [orderErr, setOrderErr] = useState('')
 
+  // DH designation (only relevant when 12+ players)
+  const [dhBBH, setDhBBH] = useState(() => draft?.dhBBH ?? '')
+  const [dhSBH, setDhSBH] = useState(() => draft?.dhSBH ?? '')
+
   // Step 4
   const [fieldingLineup, setFieldingLineup] = useState(() => draft?.fieldingLineup ?? {})
   const [fieldingOk,     setFieldingOk]     = useState(() => draft?.fieldingOk     ?? false)
+
+  // rosterMap includes temporary ringers for type lookups
+  const rosterMap = useMemo(
+    () => Object.fromEntries([...roster, ...ringers].map(p => [p.name, p.type])),
+    [roster, ringers]
+  )
 
   // Auto-save draft whenever anything changes
   useEffect(() => {
     saveSetupDraft({
       date, gameType, weAreHome, oppTeam, oppOther, oppFree,
       tournamentName, innings, detailsOk,
-      selected, playersOk, order, orderOk, fieldingLineup, fieldingOk,
+      selected, ringers, playersOk, order, orderOk,
+      dhBBH, dhSBH, fieldingLineup, fieldingOk,
     })
   }, [date, gameType, weAreHome, oppTeam, oppOther, oppFree,
       tournamentName, innings, detailsOk,
-      selected, playersOk, order, orderOk, fieldingLineup, fieldingOk])
+      selected, ringers, playersOk, order, orderOk,
+      dhBBH, dhSBH, fieldingLineup, fieldingOk])
 
-  const isLeague = gameType === 'League'
+  const isLeague     = gameType === 'League'
+  const isTournament = gameType === 'Tournament'
   const opponent = isLeague ? (oppTeam === 'Other' ? oppOther : oppTeam) : oppFree
   const home = weAreHome ? OUR_TEAM : opponent
   const away = weAreHome ? opponent : OUR_TEAM
@@ -115,6 +130,28 @@ export default function GameSetupPage({ onStart, onBack }) {
     if (selected.length < 2) { setPlayersErr('Select at least 2 players'); return }
     setPlayersErr(''); setPlayersOk(true)
     setOrder(selected.slice())
+  }
+
+  function addRinger() {
+    const name = ringerName.trim()
+    if (!name) return
+    if (rosterMap[name]) { setPlayersErr(`"${name}" already exists on the roster`); return }
+    const id = 'ringer_' + Date.now()
+    setRingers(prev => [...prev, { id, name, type: ringerType, isRinger: true }])
+    setRingerName('')
+    setPlayersOk(false); setOrder([]); setOrderOk(false)
+  }
+
+  function removeRinger(id) {
+    const r = ringers.find(r => r.id === id)
+    if (r) {
+      setSelected(prev => prev.filter(n => n !== r.name))
+      setOrder(prev => prev.filter(n => n !== r.name))
+      if (dhBBH === r.name) setDhBBH('')
+      if (dhSBH === r.name) setDhSBH('')
+    }
+    setRingers(prev => prev.filter(r => r.id !== id))
+    setPlayersOk(false); setOrderOk(false)
   }
 
   function handleDragEnd(event) {
@@ -146,7 +183,7 @@ export default function GameSetupPage({ onStart, onBack }) {
 
   function startGame() {
     clearSetupDraft()
-    const rosterFull = getRoster()
+    const rosterFull = [...getRoster(), ...ringers]
     const gameRoster = order.map(name => rosterFull.find(p => p.name === name)).filter(Boolean)
     const playerPositions = Object.fromEntries(
       Object.entries(fieldingLineup).map(([pos, name]) => [name, pos])
@@ -154,10 +191,15 @@ export default function GameSetupPage({ onStart, onBack }) {
     onStart({
       id: Date.now().toString(),
       date, gameType,
-      tournamentName: gameType === 'Tournament' ? tournamentName.trim() : '',
-      home, away, weAreHome, innings,
+      tournamentName: isTournament ? tournamentName.trim() : '',
+      home, away, weAreHome,
+      innings:  isTournament ? 99 : innings,
+      timed:    isTournament,
       battingOrder: order,
       roster: gameRoster,
+      ringers,
+      dhBBH: dhBBH || null,
+      dhSBH: dhSBH || null,
       fieldingLineup,
       playerPositions,
     })
@@ -169,8 +211,9 @@ export default function GameSetupPage({ onStart, onBack }) {
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
   )
 
-  const bbh = roster.filter(p => p.type === 'BBH')
-  const sbh = roster.filter(p => p.type === 'SBH')
+  const allPlayers = [...roster, ...ringers]
+  const bbh = allPlayers.filter(p => p.type === 'BBH')
+  const sbh = allPlayers.filter(p => p.type === 'SBH')
   const assignedCount = Object.keys(fieldingLineup).length
   const hasDraft = !!draft
 
@@ -281,15 +324,22 @@ export default function GameSetupPage({ onStart, onBack }) {
             )}
           </div>
 
-          <div>
-            <label className="label">Innings</label>
-            <div className="flex gap-2">
-              {[5,6,7,9].map(n => (
-                <button key={n} onClick={() => setInnings(n)}
-                  className={`btn btn-sm px-4 ${innings === n ? 'btn-primary' : 'btn-ghost'}`}>{n}</button>
-              ))}
+          {isTournament ? (
+            <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+              <span className="text-lg">⏱</span>
+              <p className="text-sm text-indigo-700 font-medium">Timed game — call it early when time runs out</p>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="label">Innings</label>
+              <div className="flex gap-2">
+                {[7,9].map(n => (
+                  <button key={n} onClick={() => setInnings(n)}
+                    className={`btn btn-sm px-4 ${innings === n ? 'btn-primary' : 'btn-ghost'}`}>{n}</button>
+                ))}
+              </div>
+            </div>
+          )}
           {detailsErr && <p className="text-red-600 text-sm flex gap-1"><AlertCircle size={14} className="shrink-0 mt-0.5" />{detailsErr}</p>}
           <button onClick={confirmDetails} className="btn btn-warning btn-md w-full">
             {detailsOk ? '✅ Details Confirmed' : 'Confirm Details'}
@@ -304,14 +354,55 @@ export default function GameSetupPage({ onStart, onBack }) {
             <p className="text-xs font-semibold text-gray-500 mb-1">{type}</p>
             <div className="flex flex-wrap gap-2">
               {players.map(p => (
-                <button key={p.id} type="button" onClick={() => togglePlayer(p.name)}
-                  className={`btn btn-sm ${selected.includes(p.name) ? 'btn-primary' : 'btn-ghost'}`}>
-                  {p.name}
-                </button>
+                <div key={p.id} className="relative inline-flex items-center">
+                  <button type="button" onClick={() => togglePlayer(p.name)}
+                    className={`btn btn-sm ${selected.includes(p.name) ? 'btn-primary' : 'btn-ghost'} ${p.isRinger ? 'pr-6' : ''}`}>
+                    {p.name}{p.isRinger ? ' ★' : ''}
+                  </button>
+                  {p.isRinger && (
+                    <button
+                      type="button"
+                      onClick={() => removeRinger(p.id)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
         ))}
+
+        {/* Add a ringer */}
+        <div className="border-t border-dashed border-gray-200 pt-3 mt-1 mb-3">
+          <p className="text-xs font-semibold text-gray-500 mb-2">⭐ Add a Ringer (one game only)</p>
+          <div className="flex gap-2">
+            <input
+              className="input flex-1 text-sm"
+              placeholder="Ringer name…"
+              value={ringerName}
+              onChange={e => setRingerName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addRinger()}
+            />
+            <button
+              type="button"
+              onClick={() => setRingerType(t => t === 'BBH' ? 'SBH' : 'BBH')}
+              className={`btn btn-sm shrink-0 w-12 ${ringerType === 'BBH' ? 'btn-primary' : 'bg-pink-500 text-white'}`}
+            >
+              {ringerType}
+            </button>
+            <button
+              type="button"
+              onClick={addRinger}
+              disabled={!ringerName.trim()}
+              className="btn btn-sm btn-success shrink-0"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
         <p className="text-xs text-gray-500 mb-2">{selected.length} selected</p>
         {playersErr && <p className="text-red-600 text-sm mb-2 flex gap-1"><AlertCircle size={14} className="shrink-0 mt-0.5" />{playersErr}</p>}
         <button onClick={confirmPlayers} disabled={!detailsOk} className="btn btn-warning btn-md w-full">
@@ -354,36 +445,74 @@ export default function GameSetupPage({ onStart, onBack }) {
         }
       </Step>
 
-      {/* Step 4 — Fielding Lineup */}
-      <Step n={4} done={fieldingOk} label="Fielding Lineup">
+      {/* Step 4 — DH Designation (only when 12+ players in lineup) */}
+      {orderOk && order.length >= 12 && (
+        <Step n={4} done={!!(dhBBH || dhSBH)} label="DH Designation (12-player game)">
+          <p className="text-xs text-gray-500 mb-3">
+            With 12+ players you may designate one BBH and one SBH as Designated Hitters — they bat in the order but don't take a fielding position.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label text-blue-600">BBH DH</label>
+              <select className="input text-sm" value={dhBBH} onChange={e => setDhBBH(e.target.value)}>
+                <option value="">None</option>
+                {order.filter(name => rosterMap[name] === 'BBH').map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label text-pink-600">SBH DH</label>
+              <select className="input text-sm" value={dhSBH} onChange={e => setDhSBH(e.target.value)}>
+                <option value="">None</option>
+                {order.filter(name => rosterMap[name] === 'SBH').map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {(dhBBH || dhSBH) && (
+            <p className="text-xs text-indigo-600 mt-2">
+              {[dhBBH, dhSBH].filter(Boolean).join(' & ')} will bat but won't appear in fielding positions.
+            </p>
+          )}
+        </Step>
+      )}
+
+      {/* Step 5 (or 4 if no DH step) — Fielding Lineup */}
+      <Step n={orderOk && order.length >= 12 ? 5 : 4} done={fieldingOk} label="Fielding Lineup">
         {!orderOk
           ? <p className="text-sm text-gray-400">Confirm batting order first</p>
           : <>
             <p className="text-xs text-gray-500 mb-3">
               Assign positions for your fielders. Each player can only hold one position.
+              {(dhBBH || dhSBH) && <span className="text-indigo-600"> DH players are excluded.</span>}
             </p>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2 mb-3">
-              {POSITIONS.map(pos => (
-                <div key={pos} className="flex items-center gap-2">
-                  <span className="w-8 text-xs font-bold text-gray-500 shrink-0">{pos}</span>
-                  <select
-                    className="input text-sm py-1 flex-1"
-                    value={fieldingLineup[pos] || ''}
-                    onChange={e => setPosition(pos, e.target.value)}
-                  >
-                    <option value="">—</option>
-                    {order.map(name => (
-                      <option
-                        key={name}
-                        value={name}
-                        disabled={!!fieldingLineup[pos] === false && Object.values(fieldingLineup).includes(name) && fieldingLineup[pos] !== name}
-                      >
-                        {name}{Object.values(fieldingLineup).includes(name) && fieldingLineup[pos] !== name ? ' ✓' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+              {POSITIONS.map(pos => {
+                const fielders = order.filter(name => name !== dhBBH && name !== dhSBH)
+                return (
+                  <div key={pos} className="flex items-center gap-2">
+                    <span className="w-8 text-xs font-bold text-gray-500 shrink-0">{pos}</span>
+                    <select
+                      className="input text-sm py-1 flex-1"
+                      value={fieldingLineup[pos] || ''}
+                      onChange={e => setPosition(pos, e.target.value)}
+                    >
+                      <option value="">—</option>
+                      {fielders.map(name => (
+                        <option
+                          key={name}
+                          value={name}
+                          disabled={!!fieldingLineup[pos] === false && Object.values(fieldingLineup).includes(name) && fieldingLineup[pos] !== name}
+                        >
+                          {name}{Object.values(fieldingLineup).includes(name) && fieldingLineup[pos] !== name ? ' ✓' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })}
             </div>
             <p className="text-xs text-gray-400 mb-3">{assignedCount} of {POSITIONS.length} positions assigned</p>
             <button onClick={confirmFielding} className="btn btn-warning btn-md w-full">

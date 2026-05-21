@@ -413,7 +413,12 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       <div className="card mb-3 p-3">
         <div className="flex justify-between items-center text-sm font-semibold text-gray-500 mb-1">
           <span className={!isOurBatting ? 'text-orange-600 font-bold' : ''}>{setup.away}</span>
-          <span className="text-xs">Inning {gs.inning} {gs.half === 'top' ? '▲' : '▼'} of {setup.innings}</span>
+          <span className="text-xs">
+            Inning {gs.inning} {gs.half === 'top' ? '▲' : '▼'}
+            {setup.timed
+              ? <span className="ml-1 bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded text-xs">⏱ TIMED</span>
+              : ` of ${setup.innings}`}
+          </span>
           <span className={isOurBatting ? 'text-green-700 font-bold' : ''}>{setup.home}</span>
         </div>
         <div className="flex justify-between items-center">
