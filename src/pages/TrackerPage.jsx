@@ -84,6 +84,8 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
   const [showGuide, setShowGuide] = useState(false)
   const [prevGs, setPrevGs] = useState(null) // snapshot for undo
 
+  const isOurBatting = gs.half === 'bottom'
+
   const batter = battingOrder[gs.batterIndex % battingOrder.length]
   const batterPosition = setup.playerPositions?.[batter]
   const batterType = setup.roster.find(p => p.name === batter)?.type
@@ -253,6 +255,29 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
     setSubTo('')
   }
 
+  // Simplified fielding-half helpers — used when opponents are batting (top of inning)
+  function recordOpponentOut() {
+    const snapshot = { ...gs }
+    const g = { ...gs, balls: 0, strikes: 0 }
+    g.outs++
+    if (g.outs >= 3) {
+      g.bases = [false, false, false]
+      g.outs = 0
+      g.half = 'bottom'
+    }
+    setPrevGs(snapshot)
+    persist(g)
+  }
+
+  function recordOpponentRun() {
+    const g = { ...gs }
+    g.awayScore++
+    const scores = [...g.inningScores]
+    scores[g.inning - 1] = { ...scores[g.inning - 1], away: (scores[g.inning - 1].away || 0) + 1 }
+    g.inningScores = scores
+    persist(g)
+  }
+
   function callGameEarly() {
     if (!confirm('Call game early? The current score will be saved as the final result.')) return
     const g = { ...gs, done: true }
@@ -307,12 +332,28 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
   return (
     <div className="max-w-lg mx-auto p-3 pb-24">
 
+      {/* Mode banner — makes it unmistakably clear who is batting */}
+      <div className={`rounded-lg p-2 mb-3 text-center border ${
+        isOurBatting
+          ? 'bg-green-50 border-green-200'
+          : 'bg-orange-100 border-orange-400'
+      }`}>
+        {isOurBatting ? (
+          <p className="font-bold text-green-800 text-sm">⚾ {setup.home} batting</p>
+        ) : (
+          <>
+            <p className="font-black text-orange-900">🛡️ FIELDING — {setup.away} batting</p>
+            <p className="text-xs text-orange-700 mt-0.5">Tap OUT or RUN below to track their half-inning</p>
+          </>
+        )}
+      </div>
+
       {/* Score bar */}
       <div className="card mb-3 p-3">
         <div className="flex justify-between items-center text-sm font-semibold text-gray-500 mb-1">
-          <span>{setup.away}</span>
+          <span className={!isOurBatting ? 'text-orange-600 font-bold' : ''}>{setup.away}</span>
           <span className="text-xs">Inning {gs.inning} {gs.half === 'top' ? '▲' : '▼'} of {setup.innings}</span>
-          <span>{setup.home}</span>
+          <span className={isOurBatting ? 'text-green-700 font-bold' : ''}>{setup.home}</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-4xl font-black">{gs.awayScore}</span>
@@ -352,39 +393,87 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
         </div>
       </div>
 
-      {/* Current batter */}
-      <div className="card mb-3 text-center">
-        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Now Batting</p>
-        <p className="text-2xl font-black">{batter}</p>
-        <div className="flex items-center justify-center gap-2 mt-1">
-          <span className={`text-sm font-semibold ${batterType === 'BBH' ? 'text-blue-600' : 'text-amber-600'}`}>
-            {batterType}
-          </span>
-          {batterPosition && (
-            <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded">
-              {batterPosition}
-            </span>
-          )}
+      {/* ── FIELDING HALF (opponents batting) ───────────────────── */}
+      {!isOurBatting && (
+        <div className="card mb-3">
+          <div className="grid grid-cols-2 gap-3 mb-2">
+            <button
+              onClick={recordOpponentOut}
+              className="btn btn-danger btn-md flex flex-col items-center gap-1 py-5"
+            >
+              <span className="text-3xl">✋</span>
+              <span className="font-black text-lg">OUT</span>
+              <span className="text-xs opacity-80">K · G · F · SAC</span>
+            </button>
+            <button
+              onClick={recordOpponentRun}
+              className="btn btn-warning btn-md flex flex-col items-center gap-1 py-5"
+            >
+              <span className="text-3xl">🏃</span>
+              <span className="font-black text-lg">RUN</span>
+              <span className="text-xs opacity-80">+1 for {setup.away}</span>
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 text-center">3 outs ends the half-inning · use outcome buttons below for detail</p>
         </div>
-        <p className="text-xs text-gray-400 mt-1">#{(gs.batterIndex % battingOrder.length) + 1} in order</p>
-      </div>
+      )}
 
-      {/* Outcome buttons + guide link */}
-      <div className="mb-1 flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">At-Bat Outcome</p>
-        <button onClick={() => setShowGuide(true)} className="btn btn-ghost btn-sm text-xs gap-1 text-blue-500 py-0.5">
-          <BookOpen size={12} /> What do these mean?
-        </button>
-      </div>
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        {OUTCOMES.map(o => (
-          <button key={o.code} onClick={() => applyOutcome(o.code)}
-            className={`btn ${o.color} btn-md`}>
-            <span className="font-black mr-1">{o.code}</span>
-            <span className="text-xs">{o.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* ── BATTING HALF (our team batting) ─────────────────────── */}
+      {isOurBatting && (
+        <>
+          {/* Current batter */}
+          <div className="card mb-3 text-center">
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Now Batting</p>
+            <p className="text-2xl font-black">{batter}</p>
+            <div className="flex items-center justify-center gap-2 mt-1">
+              <span className={`text-sm font-semibold ${batterType === 'BBH' ? 'text-blue-600' : 'text-amber-600'}`}>
+                {batterType}
+              </span>
+              {batterPosition && (
+                <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded">
+                  {batterPosition}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">#{(gs.batterIndex % battingOrder.length) + 1} in order</p>
+          </div>
+
+          {/* Outcome buttons + guide link */}
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">At-Bat Outcome</p>
+            <button onClick={() => setShowGuide(true)} className="btn btn-ghost btn-sm text-xs gap-1 text-blue-500 py-0.5">
+              <BookOpen size={12} /> What do these mean?
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {OUTCOMES.map(o => (
+              <button key={o.code} onClick={() => applyOutcome(o.code)}
+                className={`btn ${o.color} btn-md`}>
+                <span className="font-black mr-1">{o.code}</span>
+                <span className="text-xs">{o.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Outcome buttons also available during fielding for detailed tracking */}
+      {!isOurBatting && (
+        <details className="mb-3">
+          <summary className="text-xs text-gray-400 cursor-pointer select-none px-1">
+            ▶ Track opponent at-bats in detail (optional)
+          </summary>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {OUTCOMES.map(o => (
+              <button key={o.code} onClick={() => applyOutcome(o.code)}
+                className={`btn ${o.color} btn-md`}>
+                <span className="font-black mr-1">{o.code}</span>
+                <span className="text-xs">{o.label}</span>
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
 
       {/* Stolen base */}
       <div className="card mb-3 p-3">
