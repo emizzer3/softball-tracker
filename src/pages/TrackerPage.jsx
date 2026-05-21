@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RotateCcw, Users, MapPin, AlertTriangle, BookOpen, X, StopCircle } from 'lucide-react'
+import { RotateCcw, Users, MapPin, AlertTriangle, BookOpen, X, StopCircle, ChevronLeft } from 'lucide-react'
 import BaseDiamond from '../components/BaseDiamond'
 import { setActiveGame, getRoster } from '../storage'
 
@@ -71,7 +71,7 @@ function basesAdvanced(bases, by) {
   return [newBases, runs]
 }
 
-export default function TrackerPage({ setup, savedState, onEnd }) {
+export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   const [gs, setGs] = useState(() => savedState?.gameState || initState(setup))
   const [showFielding, setShowFielding] = useState(false)
   const [showSub, setShowSub] = useState(false)
@@ -334,6 +334,13 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
 
   return (
     <div className="max-w-lg mx-auto p-3 pb-24">
+
+      {/* Back to home */}
+      {onBack && (
+        <button onClick={onBack} className="btn btn-ghost btn-sm p-1 -ml-1 mb-2 gap-1 text-gray-500">
+          <ChevronLeft size={18} /> Home
+        </button>
+      )}
 
       {/* Mode banner — makes it unmistakably clear who is batting */}
       <div className={`rounded-lg p-2 mb-3 text-center border ${

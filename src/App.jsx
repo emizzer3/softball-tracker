@@ -125,7 +125,7 @@ export default function App() {
       {page === P.ADMIN      && <AdminPage onBack={() => setPage(P.HOME)} />}
       {page === P.SETUP      && <GameSetupPage onStart={handleGameStart} onBack={() => setPage(P.HOME)} />}
       {page === P.TRACKER    && currentSetup && (
-        <TrackerPage setup={currentSetup} savedState={savedState} onEnd={handleGameEnd} />
+        <TrackerPage setup={currentSetup} savedState={savedState} onEnd={handleGameEnd} onBack={() => setPage(P.HOME)} />
       )}
       {page === P.SCORESHEET && finishedGame && (
         <ScoresheetPage
