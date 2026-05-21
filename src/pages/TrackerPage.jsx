@@ -84,7 +84,9 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
   const [showGuide, setShowGuide] = useState(false)
   const [prevGs, setPrevGs] = useState(null) // snapshot for undo
 
-  const isOurBatting = gs.half === 'bottom'
+  // weAreHome defaults true for any games saved before this field existed
+  const weAreHome = setup.weAreHome !== false
+  const isOurBatting = weAreHome ? gs.half === 'bottom' : gs.half === 'top'
 
   const batter = battingOrder[gs.batterIndex % battingOrder.length]
   const batterPosition = setup.playerPositions?.[batter]
@@ -242,7 +244,18 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
     if (g.outs >= 3) {
       g.bases = [false, false, false]
       g.outs = 0
-      g.half = 'bottom'
+      if (weAreHome) {
+        // We're home, fielding top (away batting) — 3 outs ends top, start our bottom
+        g.half = 'bottom'
+      } else {
+        // We're away, fielding bottom (home batting) — 3 outs ends inning
+        if (g.inning >= setup.innings) {
+          g.done = true
+        } else {
+          g.inning++
+          g.half = 'top'
+        }
+      }
     }
     setPrevGs(snapshot)
     persist(g)
@@ -250,9 +263,12 @@ export default function TrackerPage({ setup, savedState, onEnd }) {
 
   function recordOpponentRun() {
     const g = { ...gs }
-    g.awayScore++
+    // Opponent is home if we're away, and vice versa
+    const opponentSide = weAreHome ? 'away' : 'home'
+    if (opponentSide === 'away') g.awayScore++
+    else g.homeScore++
     const scores = [...g.inningScores]
-    scores[g.inning - 1] = { ...scores[g.inning - 1], away: (scores[g.inning - 1].away || 0) + 1 }
+    scores[g.inning - 1] = { ...scores[g.inning - 1], [opponentSide]: (scores[g.inning - 1][opponentSide] || 0) + 1 }
     g.inningScores = scores
     persist(g)
   }

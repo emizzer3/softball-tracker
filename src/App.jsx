@@ -104,9 +104,11 @@ export default function App() {
   }
 
   function handleGameEnd(completedGame) {
-    // Determine W/L/D — assumes our team is always "home"
-    const { homeScore, awayScore } = completedGame
-    const result = homeScore > awayScore ? 'W' : homeScore < awayScore ? 'L' : 'D'
+    // Determine W/L/D from our perspective
+    const { homeScore, awayScore, weAreHome } = completedGame
+    const ourScore  = weAreHome !== false ? homeScore : awayScore
+    const theirScore = weAreHome !== false ? awayScore : homeScore
+    const result = ourScore > theirScore ? 'W' : ourScore < theirScore ? 'L' : 'D'
     const gameWithResult = { ...completedGame, result }
     saveGame(gameWithResult)
     clearActiveGame()

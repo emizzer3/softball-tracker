@@ -47,15 +47,15 @@ export default function GameSetupPage({ onStart, onBack }) {
   // Load draft on first render if one exists
   const draft = useMemo(() => getSetupDraft(), [])
 
+  const OUR_TEAM = 'The Renegades'
+
   // Step 1
   const [date,           setDate]           = useState(() => draft?.date           ?? new Date().toISOString().split('T')[0])
   const [gameType,       setGameType]       = useState(() => draft?.gameType       ?? '')
-  const [homeTeam,       setHomeTeam]       = useState(() => draft?.homeTeam       ?? '')
-  const [homeOther,      setHomeOther]      = useState(() => draft?.homeOther      ?? '')
-  const [awayTeam,       setAwayTeam]       = useState(() => draft?.awayTeam       ?? '')
-  const [awayOther,      setAwayOther]      = useState(() => draft?.awayOther      ?? '')
-  const [homeFree,       setHomeFree]       = useState(() => draft?.homeFree       ?? '')
-  const [awayFree,       setAwayFree]       = useState(() => draft?.awayFree       ?? '')
+  const [weAreHome,      setWeAreHome]      = useState(() => draft?.weAreHome      ?? true)
+  const [oppTeam,        setOppTeam]        = useState(() => draft?.oppTeam        ?? '')
+  const [oppOther,       setOppOther]       = useState(() => draft?.oppOther       ?? '')
+  const [oppFree,        setOppFree]        = useState(() => draft?.oppFree        ?? '')
   const [tournamentName, setTournamentName] = useState(() => draft?.tournamentName ?? '')
   const [innings,        setInnings]        = useState(() => draft?.innings        ?? 7)
   const [detailsOk,      setDetailsOk]      = useState(() => draft?.detailsOk     ?? false)
@@ -78,31 +78,31 @@ export default function GameSetupPage({ onStart, onBack }) {
   // Auto-save draft whenever anything changes
   useEffect(() => {
     saveSetupDraft({
-      date, gameType, homeTeam, homeOther, awayTeam, awayOther,
-      homeFree, awayFree, tournamentName, innings, detailsOk,
+      date, gameType, weAreHome, oppTeam, oppOther, oppFree,
+      tournamentName, innings, detailsOk,
       selected, playersOk, order, orderOk, fieldingLineup, fieldingOk,
     })
-  }, [date, gameType, homeTeam, homeOther, awayTeam, awayOther,
-      homeFree, awayFree, tournamentName, innings, detailsOk,
+  }, [date, gameType, weAreHome, oppTeam, oppOther, oppFree,
+      tournamentName, innings, detailsOk,
       selected, playersOk, order, orderOk, fieldingLineup, fieldingOk])
 
   const isLeague = gameType === 'League'
-  const home = isLeague ? (homeTeam === 'Other' ? homeOther : homeTeam) : homeFree
-  const away = isLeague ? (awayTeam === 'Other' ? awayOther : awayTeam) : awayFree
+  const opponent = isLeague ? (oppTeam === 'Other' ? oppOther : oppTeam) : oppFree
+  const home = weAreHome ? OUR_TEAM : opponent
+  const away = weAreHome ? opponent : OUR_TEAM
 
   function confirmDetails() {
     if (!gameType) { setDetailsErr('Select a game type'); return }
-    if (!home.trim()) { setDetailsErr('Enter home team'); return }
-    if (!away.trim()) { setDetailsErr('Enter away team'); return }
-    if (home.trim() === away.trim()) { setDetailsErr('Home and away must differ'); return }
+    if (!opponent.trim()) { setDetailsErr('Enter opponent team'); return }
+    if (opponent.trim() === OUR_TEAM) { setDetailsErr("Opponent can't also be The Renegades"); return }
     if (gameType === 'Tournament' && !tournamentName.trim()) { setDetailsErr('Enter a tournament name'); return }
     if (gameType === 'Tournament') rememberTournament(tournamentName.trim())
     setDetailsErr(''); setDetailsOk(true)
   }
 
   function resetTeamFields() {
-    setHomeTeam(''); setHomeOther(''); setAwayTeam(''); setAwayOther('')
-    setHomeFree(''); setAwayFree(''); setTournamentName('')
+    setOppTeam(''); setOppOther('')
+    setOppFree(''); setTournamentName('')
     setDetailsOk(false)
   }
 
@@ -155,7 +155,7 @@ export default function GameSetupPage({ onStart, onBack }) {
       id: Date.now().toString(),
       date, gameType,
       tournamentName: gameType === 'Tournament' ? tournamentName.trim() : '',
-      home, away, innings,
+      home, away, weAreHome, innings,
       battingOrder: order,
       roster: gameRoster,
       fieldingLineup,
@@ -243,31 +243,41 @@ export default function GameSetupPage({ onStart, onBack }) {
             </div>
           )}
 
-          {/* Team inputs */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Home/Away toggle */}
+          <div>
+            <label className="label">Are The Renegades home or away?</label>
+            <div className="flex gap-2">
+              <button type="button"
+                onClick={() => { setWeAreHome(true); setDetailsOk(false) }}
+                className={`btn btn-sm flex-1 ${weAreHome ? 'btn-primary' : 'btn-ghost'}`}>
+                🏠 Home
+              </button>
+              <button type="button"
+                onClick={() => { setWeAreHome(false); setDetailsOk(false) }}
+                className={`btn btn-sm flex-1 ${!weAreHome ? 'btn-primary' : 'btn-ghost'}`}>
+                ✈️ Away
+              </button>
+            </div>
+          </div>
+
+          {/* Opponent input */}
+          <div>
+            <label className="label">Opponent</label>
             {isLeague ? (
-              [['Home Team', homeTeam, setHomeTeam, homeOther, setHomeOther],
-               ['Away Team', awayTeam, setAwayTeam, awayOther, setAwayOther]].map(([lbl, val, fn, otherVal, otherFn]) => (
-                <div key={lbl}>
-                  <label className="label">{lbl}</label>
-                  <select className="input" value={val} onChange={e => { fn(e.target.value); setDetailsOk(false) }}>
-                    <option value="">Select…</option>
-                    {teams.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  {val === 'Other' && (
-                    <input className="input mt-1" placeholder="Team name…" value={otherVal}
-                      onChange={e => { otherFn(e.target.value); setDetailsOk(false) }} />
-                  )}
-                </div>
-              ))
+              <>
+                <select className="input" value={oppTeam}
+                  onChange={e => { setOppTeam(e.target.value); setDetailsOk(false) }}>
+                  <option value="">Select…</option>
+                  {teams.filter(t => t !== OUR_TEAM).map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                {oppTeam === 'Other' && (
+                  <input className="input mt-1" placeholder="Team name…" value={oppOther}
+                    onChange={e => { setOppOther(e.target.value); setDetailsOk(false) }} />
+                )}
+              </>
             ) : (
-              [['Home Team', homeFree, setHomeFree], ['Away Team', awayFree, setAwayFree]].map(([lbl, val, fn]) => (
-                <div key={lbl}>
-                  <label className="label">{lbl}</label>
-                  <input className="input" placeholder="Team name…" value={val}
-                    onChange={e => { fn(e.target.value); setDetailsOk(false) }} />
-                </div>
-              ))
+              <input className="input" placeholder="Opponent name…" value={oppFree}
+                onChange={e => { setOppFree(e.target.value); setDetailsOk(false) }} />
             )}
           </div>
 
