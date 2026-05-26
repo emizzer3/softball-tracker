@@ -193,7 +193,7 @@ export default function GameSetupPage({ onStart, onBack }) {
       id: Date.now().toString(),
       date, gameType,
       tournamentName: isTournament ? tournamentName.trim() : '',
-      pitch:    pitch || null,
+      pitch:    isLeague ? (pitch || null) : null,
       home, away, weAreHome,
       innings:  isTournament ? 99 : 7,
       timed:    isTournament,
@@ -326,26 +326,28 @@ export default function GameSetupPage({ onStart, onBack }) {
             )}
           </div>
 
-          {/* Pitch picker */}
-          <div>
-            <label className="label">Pitch</label>
-            <div className="flex gap-2">
-              {[1,2,3,4].map(n => (
-                <button key={n} type="button"
-                  onClick={() => { setPitch(n); setDetailsOk(false) }}
-                  className={`btn btn-sm px-4 ${pitch === n ? 'btn-primary' : 'btn-ghost'}`}>
-                  {n}
-                </button>
-              ))}
-              {pitch && (
-                <button type="button"
-                  onClick={() => { setPitch(null); setDetailsOk(false) }}
-                  className="btn btn-sm btn-ghost text-xs text-gray-400">
-                  clear
-                </button>
-              )}
+          {/* Pitch picker — only meaningful for League games */}
+          {isLeague && (
+            <div>
+              <label className="label">Pitch</label>
+              <div className="flex gap-2">
+                {[1,2,3,4].map(n => (
+                  <button key={n} type="button"
+                    onClick={() => { setPitch(n); setDetailsOk(false) }}
+                    className={`btn btn-sm px-4 ${pitch === n ? 'btn-primary' : 'btn-ghost'}`}>
+                    {n}
+                  </button>
+                ))}
+                {pitch && (
+                  <button type="button"
+                    onClick={() => { setPitch(null); setDetailsOk(false) }}
+                    className="btn btn-sm btn-ghost text-xs text-gray-400">
+                    clear
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {isTournament && (
             <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">

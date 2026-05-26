@@ -16,15 +16,27 @@ function HomePage({ onNav, onFixtureClick }) {
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
-      <div className="text-center py-4">
+      <div className="relative text-center py-5 mb-2">
+        {/* Subtle warm glow behind the logo using the team's yellow */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-2 h-40 -z-10"
+          style={{ background: 'radial-gradient(circle at center, rgba(253, 224, 71, 0.45) 0%, rgba(253, 224, 71, 0.15) 35%, transparent 65%)' }}
+        />
         <img
           src={`${import.meta.env.BASE_URL}renegades-logo.png`}
           alt="The Renegades"
-          className="w-40 h-40 mx-auto mb-2"
-          style={{ mixBlendMode: 'multiply' }}
+          className="w-40 h-40 mx-auto mb-1 drop-shadow-[0_8px_16px_rgba(20,83,45,0.25)]"
           onError={(e) => { e.currentTarget.style.display = 'none' }}
         />
-        <p className="text-gray-500 text-xs uppercase tracking-widest">Softball Tracker</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.32em] text-green-800">
+          Softball Tracker
+        </p>
+        <div className="mt-2 flex items-center justify-center gap-2 text-[10px] text-gray-400">
+          <span className="h-px w-8 bg-gray-300" />
+          <span>Bristol Division 2</span>
+          <span className="h-px w-8 bg-gray-300" />
+        </div>
       </div>
 
       <div className="space-y-3">
