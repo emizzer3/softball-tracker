@@ -17,14 +17,29 @@ function HomePage({ onNav, onFixtureClick }) {
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
-      <div className="text-center py-4">
-        <img
-          src={`${import.meta.env.BASE_URL}renegades-logo.png`}
-          alt="The Renegades"
-          className="w-40 h-40 mx-auto mb-2"
-          onError={(e) => { e.currentTarget.style.display = 'none' }}
-        />
-        <p className="text-gray-500 text-xs uppercase tracking-widest">Softball Tracker</p>
+      <div className="text-center py-6">
+        {/* Generic softball logo — inline SVG so it's crisp at any size */}
+        <svg
+          viewBox="0 0 100 100"
+          className="w-24 h-24 mx-auto mb-3 drop-shadow-sm"
+          aria-label="Softball Tracker"
+        >
+          {/* Ball */}
+          <circle cx="50" cy="50" r="42" fill="#fef3c7" stroke="#1e40af" strokeWidth="2.5" />
+          {/* Two arcing stitch lines — classic softball look */}
+          <path
+            d="M 18 32 Q 50 56 82 32"
+            stroke="#dc2626" strokeWidth="2" fill="none" strokeLinecap="round"
+            strokeDasharray="3 4"
+          />
+          <path
+            d="M 18 68 Q 50 44 82 68"
+            stroke="#dc2626" strokeWidth="2" fill="none" strokeLinecap="round"
+            strokeDasharray="3 4"
+          />
+        </svg>
+        <h1 className="text-2xl font-black tracking-tight text-gray-800">Softball Tracker</h1>
+        <p className="text-gray-400 text-xs mt-0.5">Mixed recreational slow-pitch</p>
       </div>
 
       <div className="space-y-3">
