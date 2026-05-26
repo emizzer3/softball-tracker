@@ -46,7 +46,10 @@ function HomePage({ onNav }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">vs {g.opponent}</p>
-                    <p className="text-xs text-gray-500">{g.time || ''}{g.location ? (g.time ? ' · ' : '') + g.location : ''}</p>
+                    <p className="text-xs text-gray-500">
+                      {g.location === 'Home' ? '🏠 Home' : g.location === 'Away' ? '✈️ Away' : ''}
+                      {g.time ? (g.location ? ' · ' : '') + g.time : ''}
+                    </p>
                   </div>
                   <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{g.gameType || 'Game'}</span>
                 </li>
