@@ -37,14 +37,14 @@ function validateOrder(order, rosterMap) {
   return null
 }
 
-export default function GameSetupPage({ onStart, onBack }) {
+export default function GameSetupPage({ draftKey = 'default', onStart, onBack }) {
   const roster = useMemo(() => getRoster().filter(p => p.active), [])
   const teams = useMemo(() => [...getTeams(), 'Other'], [])
   const division = useMemo(() => getDivision(), [])
   const pastTournaments = useMemo(() => getTournaments(), [])
 
-  // Load draft on first render if one exists
-  const draft = useMemo(() => getSetupDraft(), [])
+  // Load draft for this specific fixture/slot on first render
+  const draft = useMemo(() => getSetupDraft(draftKey), [draftKey])
 
   const OUR_TEAM = 'The Renegades'
 
@@ -88,15 +88,17 @@ export default function GameSetupPage({ onStart, onBack }) {
     [roster, ringers]
   )
 
-  // Auto-save draft whenever anything changes
+  // Auto-save draft whenever anything changes (keyed by fixture)
   useEffect(() => {
-    saveSetupDraft({
+    saveSetupDraft(draftKey, {
       date, gameType, weAreHome, oppTeam, oppOther, oppFree,
       tournamentName, pitch, innings, detailsOk,
       selected, ringers, playersOk, order, orderOk,
       dhBBH, dhSBH, fieldingLineup, fieldingOk,
+      fixtureId: draft?.fixtureId,
+      opponentLabel: draft?.opponentLabel,
     })
-  }, [date, gameType, weAreHome, oppTeam, oppOther, oppFree,
+  }, [draftKey, date, gameType, weAreHome, oppTeam, oppOther, oppFree,
       tournamentName, pitch, innings, detailsOk,
       selected, ringers, playersOk, order, orderOk,
       dhBBH, dhSBH, fieldingLineup, fieldingOk])
@@ -183,7 +185,7 @@ export default function GameSetupPage({ onStart, onBack }) {
   function confirmFielding() { setFieldingOk(true) }
 
   function startGame() {
-    clearSetupDraft()
+    clearSetupDraft(draftKey)
     const rosterFull = [...getRoster(), ...ringers]
     const gameRoster = order.map(name => rosterFull.find(p => p.name === name)).filter(Boolean)
     const playerPositions = Object.fromEntries(
@@ -238,7 +240,7 @@ export default function GameSetupPage({ onStart, onBack }) {
         <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-sm">
           <span className="text-amber-800">↩ Setup restored from last time</span>
           <button
-            onClick={() => { clearSetupDraft(); window.location.reload() }}
+            onClick={() => { clearSetupDraft(draftKey); window.location.reload() }}
             className="text-xs text-amber-600 underline ml-2 shrink-0"
           >
             Start fresh

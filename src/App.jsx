@@ -5,7 +5,7 @@ import TrackerPage from './pages/TrackerPage'
 import ScoresheetPage from './pages/ScoresheetPage'
 import SummaryPage from './pages/SummaryPage'
 import SeasonStatsPage from './pages/SeasonStatsPage'
-import { saveGame, getActiveGame, clearActiveGame, getSchedule, saveSetupDraft } from './storage'
+import { saveGame, getActiveGame, clearActiveGame, getSchedule, saveSetupDraft, getSetupDraft, getAllSetupDrafts } from './storage'
 import { Settings, Plus, BarChart2, CalendarDays, ChevronRight } from 'lucide-react'
 
 const P = { HOME: 'home', ADMIN: 'admin', SETUP: 'setup', TRACKER: 'tracker', SCORESHEET: 'scoresheet', SUMMARY: 'summary', SEASON: 'season' }
@@ -13,6 +13,7 @@ const P = { HOME: 'home', ADMIN: 'admin', SETUP: 'setup', TRACKER: 'tracker', SC
 function HomePage({ onNav, onFixtureClick }) {
   const activeGame = getActiveGame()
   const upcoming = getSchedule().filter(g => g.date >= new Date().toISOString().split('T')[0]).slice(0, 3)
+  const drafts = getAllSetupDrafts()
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
@@ -43,26 +44,34 @@ function HomePage({ onNav, onFixtureClick }) {
               <CalendarDays size={12} /> Upcoming
             </p>
             <ul className="space-y-2">
-              {upcoming.map(g => (
-                <li key={g.id}
-                  onClick={() => onFixtureClick(g)}
-                  className="flex items-center gap-2 cursor-pointer hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors -mx-1 px-1 py-0.5"
-                >
-                  <div className="text-center bg-blue-50 rounded px-2 py-1 min-w-10 shrink-0">
-                    <p className="text-xs font-bold text-blue-700">{new Date(g.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">vs {g.opponent}</p>
-                    <p className="text-xs text-gray-500">
-                      {g.location === 'Home' ? '🏠 Home' : g.location === 'Away' ? '✈️ Away' : ''}
-                      {g.pitch ? (g.location ? ' · ' : '') + `Pitch ${g.pitch}` : ''}
-                      {g.time ? ((g.location || g.pitch) ? ' · ' : '') + g.time : ''}
-                    </p>
-                  </div>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded shrink-0">{g.gameType || 'Game'}</span>
-                  <ChevronRight size={14} className="text-gray-300 shrink-0" />
-                </li>
-              ))}
+              {upcoming.map(g => {
+                const hasDraft = !!drafts[`fixture-${g.id}`]
+                return (
+                  <li key={g.id}
+                    onClick={() => onFixtureClick(g)}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors -mx-1 px-1 py-0.5"
+                  >
+                    <div className="text-center bg-blue-50 rounded px-2 py-1 min-w-10 shrink-0">
+                      <p className="text-xs font-bold text-blue-700">{new Date(g.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate flex items-center gap-1.5">
+                        vs {g.opponent}
+                        {hasDraft && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded-full">📝 Setup saved</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {g.location === 'Home' ? '🏠 Home' : g.location === 'Away' ? '✈️ Away' : ''}
+                        {g.pitch ? (g.location ? ' · ' : '') + `Pitch ${g.pitch}` : ''}
+                        {g.time ? ((g.location || g.pitch) ? ' · ' : '') + g.time : ''}
+                      </p>
+                    </div>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded shrink-0">{g.gameType || 'Game'}</span>
+                    <ChevronRight size={14} className="text-gray-300 shrink-0" />
+                  </li>
+                )
+              })}
             </ul>
           </div>
         )}
@@ -100,18 +109,33 @@ export default function App() {
   const [currentSetup, setCurrentSetup] = useState(null)
   const [savedState, setSavedState] = useState(null)
   const [finishedGame, setFinishedGame] = useState(null)
+  const [draftKey, setDraftKey] = useState('default')
 
   function handleNav(p, data) {
     if (p === P.TRACKER && data?.setup) {
       setCurrentSetup(data.setup)
       setSavedState(data)
     }
+    if (p === P.SETUP) {
+      setDraftKey('default')
+    }
     setPage(p)
   }
 
   function handleFixtureSetup(fixture) {
+    // Each fixture gets its own draft slot so multiple games can be staged
+    const key = `fixture-${fixture.id}`
+    setDraftKey(key)
+    // If there's already a saved draft for this fixture, KEEP it — don't overwrite.
+    // Otherwise seed a fresh draft from the fixture metadata.
+    if (getSetupDraft(key)) {
+      setPage(P.SETUP)
+      return
+    }
     const isLeague = fixture.gameType === 'League'
-    saveSetupDraft({
+    saveSetupDraft(key, {
+      fixtureId:  fixture.id,
+      opponentLabel: fixture.opponent,
       date:       fixture.date,
       gameType:   fixture.gameType || 'League',
       weAreHome:  fixture.location === 'Home',
@@ -166,6 +190,7 @@ export default function App() {
     } else if (currentSetup) {
       setPage(P.TRACKER)
     } else {
+      setDraftKey('default')
       setPage(P.SETUP)
     }
   }
@@ -174,7 +199,7 @@ export default function App() {
     <>
       {page === P.HOME       && <HomePage onNav={handleNav} onFixtureClick={handleFixtureSetup} />}
       {page === P.ADMIN      && <AdminPage onBack={() => setPage(P.HOME)} />}
-      {page === P.SETUP      && <GameSetupPage onStart={handleGameStart} onBack={() => setPage(P.HOME)} />}
+      {page === P.SETUP      && <GameSetupPage draftKey={draftKey} onStart={handleGameStart} onBack={() => setPage(P.HOME)} />}
       {page === P.TRACKER    && currentSetup && (
         <TrackerPage setup={currentSetup} savedState={savedState} onEnd={handleGameEnd} onBack={() => setPage(P.HOME)} />
       )}
@@ -183,7 +208,7 @@ export default function App() {
           <p className="text-5xl mb-4">🎮</p>
           <p className="font-semibold text-lg mb-1">No game in progress</p>
           <p className="text-sm mb-6">Set up a new game first, then come back here to track it.</p>
-          <button onClick={() => setPage(P.SETUP)} className="btn btn-primary btn-md">Go to Setup</button>
+          <button onClick={() => { setDraftKey('default'); setPage(P.SETUP) }} className="btn btn-primary btn-md">Go to Setup</button>
         </div>
       )}
       {page === P.SCORESHEET && finishedGame && (
@@ -211,7 +236,7 @@ export default function App() {
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around z-40 no-print pb-safe">
           {[
             { p: P.HOME,    icon: '⚾',                   label: 'Home',    action: () => setPage(P.HOME) },
-            { p: P.SETUP,   icon: <Plus size={20} />,     label: 'Setup',   action: () => setPage(P.SETUP) },
+            { p: P.SETUP,   icon: <Plus size={20} />,     label: 'Setup',   action: () => { setDraftKey('default'); setPage(P.SETUP) } },
             { p: P.TRACKER, icon: <span className="relative inline-block">
                 🎮
                 {hasActiveGame && <span className="absolute -top-0.5 -right-1.5 w-2 h-2 bg-green-500 rounded-full border border-white" />}

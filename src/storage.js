@@ -159,10 +159,26 @@ export function getActiveGame() { return get(K.ACTIVE_GAME, null) }
 export function setActiveGame(game) { set(K.ACTIVE_GAME, game) }
 export function clearActiveGame() { localStorage.removeItem(K.ACTIVE_GAME) }
 
-// ── Setup draft (partial game setup, survives navigation) ─────
-export function getSetupDraft() { return get('sft_setup_draft', null) }
-export function saveSetupDraft(draft) { set('sft_setup_draft', draft) }
-export function clearSetupDraft() { localStorage.removeItem('sft_setup_draft') }
+// ── Setup drafts (per-fixture; survive navigation; multiple may co-exist) ─
+const K_DRAFTS = 'sft_setup_drafts'
+export function getAllSetupDrafts() { return get(K_DRAFTS, {}) }
+export function getSetupDraft(key = 'default') { return getAllSetupDrafts()[key] || null }
+export function saveSetupDraft(key, draft) {
+  // Back-compat: if called with a single argument that's an object, treat as the default slot
+  if (typeof key === 'object' && key !== null && draft === undefined) {
+    draft = key
+    key = 'default'
+  }
+  const all = getAllSetupDrafts()
+  all[key] = draft
+  set(K_DRAFTS, all)
+}
+export function clearSetupDraft(key = 'default') {
+  const all = getAllSetupDrafts()
+  delete all[key]
+  set(K_DRAFTS, all)
+}
+export function hasSetupDraft(key) { return !!getSetupDraft(key) }
 
 // ── Backup / Restore ──────────────────────────────────────────
 export function exportAllData() {
