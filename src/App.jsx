@@ -117,7 +117,24 @@ export default function App() {
     setPage(P.SCORESHEET)
   }
 
-  const showNav = [P.HOME, P.SETUP, P.SEASON, P.ADMIN].includes(page)
+  const activeGame = getActiveGame()
+  const hasActiveGame = !!(currentSetup || activeGame)
+
+  // Nav is always visible except on scoresheet/summary (post-game review)
+  const showNav = ![P.SCORESHEET, P.SUMMARY].includes(page)
+
+  function handleTrackerTab() {
+    if (currentSetup) {
+      setPage(P.TRACKER)
+    } else if (activeGame) {
+      setCurrentSetup(activeGame.setup)
+      setSavedState(activeGame)
+      setPage(P.TRACKER)
+    } else {
+      // No game ready — send them to setup
+      setPage(P.SETUP)
+    }
+  }
 
   return (
     <>
@@ -126,6 +143,14 @@ export default function App() {
       {page === P.SETUP      && <GameSetupPage onStart={handleGameStart} onBack={() => setPage(P.HOME)} />}
       {page === P.TRACKER    && currentSetup && (
         <TrackerPage setup={currentSetup} savedState={savedState} onEnd={handleGameEnd} onBack={() => setPage(P.HOME)} />
+      )}
+      {page === P.TRACKER    && !currentSetup && (
+        <div className="max-w-lg mx-auto p-8 text-center text-gray-400 mt-16">
+          <p className="text-5xl mb-4">🎮</p>
+          <p className="font-semibold text-lg mb-1">No game in progress</p>
+          <p className="text-sm mb-6">Set up a new game first, then come back here to track it.</p>
+          <button onClick={() => setPage(P.SETUP)} className="btn btn-primary btn-md">Go to Setup</button>
+        </div>
       )}
       {page === P.SCORESHEET && finishedGame && (
         <ScoresheetPage
@@ -151,15 +176,19 @@ export default function App() {
       {showNav && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around z-40 no-print pb-safe">
           {[
-            { p: P.HOME,   icon: '⚾', label: 'Home' },
-            { p: P.SETUP,  icon: <Plus size={20} />, label: 'New Game' },
-            { p: P.SEASON, icon: <BarChart2 size={20} />, label: 'Stats' },
-            { p: P.ADMIN,  icon: <Settings size={20} />, label: 'Admin' },
-          ].map(({ p, icon, label }) => (
+            { p: P.HOME,    icon: '⚾',                   label: 'Home',    action: () => setPage(P.HOME) },
+            { p: P.SETUP,   icon: <Plus size={20} />,     label: 'Setup',   action: () => setPage(P.SETUP) },
+            { p: P.TRACKER, icon: <span className="relative inline-block">
+                🎮
+                {hasActiveGame && <span className="absolute -top-0.5 -right-1.5 w-2 h-2 bg-green-500 rounded-full border border-white" />}
+              </span>,                                     label: 'Tracker', action: handleTrackerTab },
+            { p: P.SEASON,  icon: <BarChart2 size={20} />,label: 'Stats',   action: () => setPage(P.SEASON) },
+            { p: P.ADMIN,   icon: <Settings size={20} />, label: 'Admin',   action: () => setPage(P.ADMIN) },
+          ].map(({ p, icon, label, action }) => (
             <button
               key={p}
-              onClick={() => setPage(p)}
-              className={`flex flex-col items-center py-2 px-4 text-xs font-medium transition-colors ${page === p ? 'text-blue-600' : 'text-gray-500'}`}
+              onClick={action}
+              className={`flex flex-col items-center py-2 px-3 text-xs font-medium transition-colors ${page === p ? 'text-blue-600' : 'text-gray-500'}`}
             >
               <span className="mb-0.5">{icon}</span>
               {label}
