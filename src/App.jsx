@@ -16,10 +16,15 @@ function HomePage({ onNav, onFixtureClick }) {
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
-      <div className="text-center py-8">
-        <p className="text-6xl mb-3">⚾</p>
-        <h1 className="text-3xl font-black mb-1">Softball Tracker</h1>
-        <p className="text-gray-500 text-sm">Mixed recreational slow-pitch</p>
+      <div className="text-center py-6">
+        <img
+          src={`${import.meta.env.BASE_URL}renegades-logo.png`}
+          alt="The Renegades"
+          className="w-28 h-28 mx-auto mb-3 rounded-full shadow-md object-cover"
+          onError={(e) => { e.currentTarget.style.display = 'none' }}
+        />
+        <h1 className="text-3xl font-black mb-1">The Renegades</h1>
+        <p className="text-gray-500 text-sm">Softball Tracker · Est. 2023</p>
       </div>
 
       <div className="space-y-3">

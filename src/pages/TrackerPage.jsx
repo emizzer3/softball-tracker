@@ -408,7 +408,23 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     persist(g)
   }
 
-  function toggleOpponentBase(i) {
+  function recordOurRun() {
+    // Manually score a run for whichever side is currently batting
+    const g = { ...gs }
+    const battingSide = gs.half === 'top' ? 'away' : 'home'
+    if (battingSide === 'away') g.awayScore++
+    else g.homeScore++
+    const scores = [...g.inningScores]
+    scores[g.inning - 1] = { ...scores[g.inning - 1], [battingSide]: (scores[g.inning - 1][battingSide] || 0) + 1 }
+    g.inningScores = scores
+    // Walk-off check (home batting in bottom of last inning takes lead)
+    if (g.half === 'bottom' && g.inning >= setup.innings && g.homeScore > g.awayScore) {
+      g.done = true
+    }
+    persist(g)
+  }
+
+  function toggleBase(i) {
     const g = { ...gs }
     const newBases = [...g.bases]
     newBases[i] = !newBases[i]
@@ -517,8 +533,9 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       </div>
 
       {/* Diamond + count */}
-      <div className="card mb-3 flex items-center gap-4 justify-center p-4">
-        <BaseDiamond bases={gs.bases} size={120} />
+      <div className="card mb-3 p-4">
+        <div className="flex items-center gap-4 justify-center">
+          <BaseDiamond bases={gs.bases} size={120} onToggle={toggleBase} />
         {isOurBatting ? (
           <div className="space-y-2">
             <div>
@@ -541,6 +558,13 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
               <button onClick={() => addCount('ball')} className="btn btn-ghost btn-sm me-1">+Ball</button>
               <button onClick={() => addCount('strike')} className="btn btn-ghost btn-sm">+Strike</button>
             </div>
+            <button
+              onClick={recordOurRun}
+              className="btn btn-sm bg-amber-500 hover:bg-amber-600 text-white w-full gap-1 mt-1"
+              title="Add a run if a runner scored that the default advancement missed"
+            >
+              <span>🏃</span> +1 Run
+            </button>
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -549,7 +573,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
               <button
                 key={i}
                 type="button"
-                onClick={() => toggleOpponentBase(i)}
+                onClick={() => toggleBase(i)}
                 className={`btn btn-sm w-full ${gs.bases[i] ? 'btn-warning' : 'btn-ghost'}`}
               >
                 {gs.bases[i] ? '🟡' : '○'} {label}
@@ -557,6 +581,8 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
             ))}
           </div>
         )}
+        </div>
+        <p className="text-[11px] text-gray-400 text-center mt-2">Tap a base to manually add/remove a runner</p>
       </div>
 
       {/* ── FIELDING HALF (opponents batting) ───────────────────── */}

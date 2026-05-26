@@ -1,5 +1,7 @@
-// Renders the baseball diamond SVG with bases highlighted
-export default function BaseDiamond({ bases, size = 100 }) {
+// Renders the baseball diamond SVG with bases highlighted.
+// Pass onToggle(i) to make a base tappable — used to manually
+// add/remove a runner on that base (1B/2B/3B → i = 0/1/2).
+export default function BaseDiamond({ bases, size = 100, onToggle }) {
   // bases: [first, second, third] booleans
   const cx = size / 2
   const r  = size * 0.38
@@ -30,16 +32,27 @@ export default function BaseDiamond({ bases, size = 100 }) {
 
       {/* Bases — rotated squares at each corner */}
       {[first, second, third].map(([x, y], i) => (
-        <rect
-          key={i}
-          x={x - s / 2} y={y - s / 2}
-          width={s} height={s}
-          rx={2}
-          transform={`rotate(45, ${x}, ${y})`}
-          fill={bases[i] ? '#f59e0b' : '#e2e8f0'}
-          stroke={bases[i] ? '#d97706' : '#94a3b8'}
-          strokeWidth={1.5}
-        />
+        <g key={i}>
+          {/* Larger invisible tap target around each base for easier touch */}
+          {onToggle && (
+            <circle
+              cx={x} cy={y} r={size * 0.13}
+              fill="transparent"
+              style={{ cursor: 'pointer' }}
+              onClick={() => onToggle(i)}
+            />
+          )}
+          <rect
+            x={x - s / 2} y={y - s / 2}
+            width={s} height={s}
+            rx={2}
+            transform={`rotate(45, ${x}, ${y})`}
+            fill={bases[i] ? '#f59e0b' : '#e2e8f0'}
+            stroke={bases[i] ? '#d97706' : '#94a3b8'}
+            strokeWidth={1.5}
+            style={onToggle ? { cursor: 'pointer', pointerEvents: 'none' } : undefined}
+          />
+        </g>
       ))}
 
       {/* Home plate */}
