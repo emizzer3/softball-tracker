@@ -56,6 +56,7 @@ export default function GameSetupPage({ onStart, onBack }) {
   const [oppOther,       setOppOther]       = useState(() => draft?.oppOther       ?? '')
   const [oppFree,        setOppFree]        = useState(() => draft?.oppFree        ?? '')
   const [tournamentName, setTournamentName] = useState(() => draft?.tournamentName ?? '')
+  const [pitch,          setPitch]          = useState(() => draft?.pitch          ?? null)
   const [innings]        = useState(7) // always 7 for league/friendly; tournaments use 99
   const [detailsOk,      setDetailsOk]      = useState(() => draft?.detailsOk     ?? false)
   const [detailsErr,     setDetailsErr]     = useState('')
@@ -91,12 +92,12 @@ export default function GameSetupPage({ onStart, onBack }) {
   useEffect(() => {
     saveSetupDraft({
       date, gameType, weAreHome, oppTeam, oppOther, oppFree,
-      tournamentName, innings, detailsOk,
+      tournamentName, pitch, innings, detailsOk,
       selected, ringers, playersOk, order, orderOk,
       dhBBH, dhSBH, fieldingLineup, fieldingOk,
     })
   }, [date, gameType, weAreHome, oppTeam, oppOther, oppFree,
-      tournamentName, innings, detailsOk,
+      tournamentName, pitch, innings, detailsOk,
       selected, ringers, playersOk, order, orderOk,
       dhBBH, dhSBH, fieldingLineup, fieldingOk])
 
@@ -192,6 +193,7 @@ export default function GameSetupPage({ onStart, onBack }) {
       id: Date.now().toString(),
       date, gameType,
       tournamentName: isTournament ? tournamentName.trim() : '',
+      pitch:    pitch || null,
       home, away, weAreHome,
       innings:  isTournament ? 99 : 7,
       timed:    isTournament,
@@ -322,6 +324,27 @@ export default function GameSetupPage({ onStart, onBack }) {
               <input className="input" placeholder="Opponent name…" value={oppFree}
                 onChange={e => { setOppFree(e.target.value); setDetailsOk(false) }} />
             )}
+          </div>
+
+          {/* Pitch picker */}
+          <div>
+            <label className="label">Pitch</label>
+            <div className="flex gap-2">
+              {[1,2,3,4].map(n => (
+                <button key={n} type="button"
+                  onClick={() => { setPitch(n); setDetailsOk(false) }}
+                  className={`btn btn-sm px-4 ${pitch === n ? 'btn-primary' : 'btn-ghost'}`}>
+                  {n}
+                </button>
+              ))}
+              {pitch && (
+                <button type="button"
+                  onClick={() => { setPitch(null); setDetailsOk(false) }}
+                  className="btn btn-sm btn-ghost text-xs text-gray-400">
+                  clear
+                </button>
+              )}
+            </div>
           </div>
 
           {isTournament && (

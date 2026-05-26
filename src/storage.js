@@ -104,20 +104,20 @@ export function rememberTournament(name) {
 // ── Schedule (upcoming fixtures) ─────────────────────────────
 // Only Renegades fixtures from the Bristol Division 2 2026 schedule
 const DEFAULT_SCHEDULE = [
-  { id: 's1',  date: '2026-04-30', opponent: 'Grandslammers',     gameType: 'League', location: 'Away' },
-  { id: 's2',  date: '2026-05-07', opponent: 'Buccs Whizz',       gameType: 'League', location: 'Away' },
-  { id: 's3',  date: '2026-05-14', opponent: 'Monkeys',           gameType: 'League', location: 'Home' },
-  { id: 's4',  date: '2026-05-21', opponent: 'Archway',           gameType: 'League', location: 'Home' },
-  { id: 's5',  date: '2026-05-28', opponent: 'Vandals',           gameType: 'League', location: 'Away' },
-  { id: 's6',  date: '2026-06-04', opponent: 'BAM!',              gameType: 'League', location: 'Away' },
-  { id: 's7',  date: '2026-06-11', opponent: 'Victorious Secret', gameType: 'League', location: 'Home' },
-  { id: 's8',  date: '2026-06-18', opponent: 'Grandslammers',     gameType: 'League', location: 'Home' },
-  { id: 's9',  date: '2026-06-25', opponent: 'Buccs Whizz',       gameType: 'League', location: 'Home' },
-  { id: 's10', date: '2026-07-02', opponent: 'Monkeys',           gameType: 'League', location: 'Away' },
-  { id: 's11', date: '2026-07-16', opponent: 'Archway',           gameType: 'League', location: 'Away' },
-  { id: 's12', date: '2026-07-23', opponent: 'Vandals',           gameType: 'League', location: 'Home' },
-  { id: 's13', date: '2026-07-30', opponent: 'BAM!',              gameType: 'League', location: 'Home' },
-  { id: 's14', date: '2026-08-13', opponent: 'Victorious Secret', gameType: 'League', location: 'Away' },
+  { id: 's1',  date: '2026-04-30', opponent: 'Grandslammers',     gameType: 'League', location: 'Away', pitch: 2 },
+  { id: 's2',  date: '2026-05-07', opponent: 'Buccs Whizz',       gameType: 'League', location: 'Away', pitch: 3 },
+  { id: 's3',  date: '2026-05-14', opponent: 'Monkeys',           gameType: 'League', location: 'Home', pitch: 1 },
+  { id: 's4',  date: '2026-05-21', opponent: 'Archway',           gameType: 'League', location: 'Home', pitch: 2 },
+  { id: 's5',  date: '2026-05-28', opponent: 'Vandals',           gameType: 'League', location: 'Away', pitch: 4 },
+  { id: 's6',  date: '2026-06-04', opponent: 'BAM!',              gameType: 'League', location: 'Away', pitch: 1 },
+  { id: 's7',  date: '2026-06-11', opponent: 'Victorious Secret', gameType: 'League', location: 'Home', pitch: 3 },
+  { id: 's8',  date: '2026-06-18', opponent: 'Grandslammers',     gameType: 'League', location: 'Home', pitch: 1 },
+  { id: 's9',  date: '2026-06-25', opponent: 'Buccs Whizz',       gameType: 'League', location: 'Home', pitch: 4 },
+  { id: 's10', date: '2026-07-02', opponent: 'Monkeys',           gameType: 'League', location: 'Away', pitch: 2 },
+  { id: 's11', date: '2026-07-16', opponent: 'Archway',           gameType: 'League', location: 'Away', pitch: 1 },
+  { id: 's12', date: '2026-07-23', opponent: 'Vandals',           gameType: 'League', location: 'Home', pitch: 3 },
+  { id: 's13', date: '2026-07-30', opponent: 'BAM!',              gameType: 'League', location: 'Home', pitch: 2 },
+  { id: 's14', date: '2026-08-13', opponent: 'Victorious Secret', gameType: 'League', location: 'Away', pitch: 4 },
 ]
 
 export function getSchedule() { return get(K.SCHEDULE, DEFAULT_SCHEDULE) }

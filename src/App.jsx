@@ -51,7 +51,8 @@ function HomePage({ onNav, onFixtureClick }) {
                     <p className="text-sm font-semibold truncate">vs {g.opponent}</p>
                     <p className="text-xs text-gray-500">
                       {g.location === 'Home' ? '🏠 Home' : g.location === 'Away' ? '✈️ Away' : ''}
-                      {g.time ? (g.location ? ' · ' : '') + g.time : ''}
+                      {g.pitch ? (g.location ? ' · ' : '') + `Pitch ${g.pitch}` : ''}
+                      {g.time ? ((g.location || g.pitch) ? ' · ' : '') + g.time : ''}
                     </p>
                   </div>
                   <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded shrink-0">{g.gameType || 'Game'}</span>
@@ -114,6 +115,7 @@ export default function App() {
       oppOther:   '',
       oppFree:    isLeague ? '' : fixture.opponent,
       tournamentName: '',
+      pitch:      fixture.pitch || null,
       detailsOk:  false,
       selected: [], ringers: [], playersOk: false,
       order: [], orderOk: false,
