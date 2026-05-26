@@ -25,7 +25,7 @@ const OUTCOME_GUIDE = [
   { code: '2B',  label: 'Double',           desc: 'Hit the ball and safely reached 2nd base.' },
   { code: '3B',  label: 'Triple',           desc: 'Hit the ball and safely reached 3rd base.' },
   { code: 'HR',  label: 'Home Run',         desc: 'Hit over/to the fence — batter runs all bases and scores.' },
-  { code: 'BB',  label: 'Walk',             desc: 'Pitcher threw 4 balls — batter walks to 1st. Doesn\'t count as an at-bat.' },
+  { code: 'BB',  label: 'Walk',             desc: '4 balls — co-ed rule: SBH walks to 1st, BBH walks straight to 2nd (deters pitchers from intentionally walking the male). Doesn\'t count as an at-bat.' },
   { code: 'K',   label: 'Strikeout',        desc: '3 strikes and the batter is out. Catcher auto-gets the putout (PO).' },
   { code: 'F',   label: 'Flyout',           desc: 'Batter hit the ball in the air and a fielder caught it before it bounced.' },
   { code: 'G',   label: 'Groundout',        desc: 'Batter hit a ground ball and was thrown out at first (or another base).' },
@@ -35,8 +35,9 @@ const OUTCOME_GUIDE = [
 ]
 
 const BASES_ON_OUTCOME = {
-  '1B': 1, '2B': 2, '3B': 3, 'HR': 4, 'BB': 1, 'E': 1, 'FC': 1,
+  '1B': 1, '2B': 2, '3B': 3, 'HR': 4, 'E': 1, 'FC': 1,
   // SAC handled separately — user picks how many runners tagged up and scored
+  // BB handled separately — co-ed rule: BBH walks to 2B, SBH walks to 1B
 }
 
 function initState(setup) {
@@ -159,6 +160,32 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
         if (newBases[i]) { newBases[i] = false; break }
       }
       newBases[0] = true
+    } else if (code === 'BB') {
+      // Walk: only forced runners advance (chain from 1B). Co-ed rule:
+      // BBH walks to 2B, SBH walks to 1B.
+      const walkBases = batterType === 'BBH' ? 2 : 1
+
+      // Step 1: standard walk to 1B with chain force
+      let chainEnd = 0
+      while (chainEnd < 3 && newBases[chainEnd]) chainEnd++
+      if (chainEnd === 3) {
+        runs++ // bases-loaded walk → 1 run forced home
+      } else {
+        newBases[chainEnd] = true
+      }
+
+      // Step 2: BBH walk — batter advances from 1B to 2B with chain force
+      if (walkBases >= 2) {
+        let chainEnd2 = 1
+        while (chainEnd2 < 3 && newBases[chainEnd2]) chainEnd2++
+        if (chainEnd2 === 3) {
+          runs++ // chain force from 1B→2B→3B→home scores another run
+          newBases[0] = false
+        } else {
+          newBases[chainEnd2] = true
+          newBases[0] = false
+        }
+      }
     } else if (code === 'SAC') {
       // Sacrifice fly: user has told us how many runners tagged up and scored.
       // Remove the N lead runners from the bases — they're the ones who scored.
