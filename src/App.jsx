@@ -5,12 +5,12 @@ import TrackerPage from './pages/TrackerPage'
 import ScoresheetPage from './pages/ScoresheetPage'
 import SummaryPage from './pages/SummaryPage'
 import SeasonStatsPage from './pages/SeasonStatsPage'
-import { saveGame, getActiveGame, clearActiveGame, getSchedule } from './storage'
-import { Settings, Plus, BarChart2, CalendarDays } from 'lucide-react'
+import { saveGame, getActiveGame, clearActiveGame, getSchedule, saveSetupDraft } from './storage'
+import { Settings, Plus, BarChart2, CalendarDays, ChevronRight } from 'lucide-react'
 
 const P = { HOME: 'home', ADMIN: 'admin', SETUP: 'setup', TRACKER: 'tracker', SCORESHEET: 'scoresheet', SUMMARY: 'summary', SEASON: 'season' }
 
-function HomePage({ onNav }) {
+function HomePage({ onNav, onFixtureClick }) {
   const activeGame = getActiveGame()
   const upcoming = getSchedule().filter(g => g.date >= new Date().toISOString().split('T')[0]).slice(0, 3)
 
@@ -40,8 +40,11 @@ function HomePage({ onNav }) {
             </p>
             <ul className="space-y-2">
               {upcoming.map(g => (
-                <li key={g.id} className="flex items-center gap-2">
-                  <div className="text-center bg-blue-50 rounded px-2 py-1 min-w-10">
+                <li key={g.id}
+                  onClick={() => onFixtureClick(g)}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors -mx-1 px-1 py-0.5"
+                >
+                  <div className="text-center bg-blue-50 rounded px-2 py-1 min-w-10 shrink-0">
                     <p className="text-xs font-bold text-blue-700">{new Date(g.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
                   </div>
                   <div className="flex-1 min-w-0">
@@ -51,7 +54,8 @@ function HomePage({ onNav }) {
                       {g.time ? (g.location ? ' · ' : '') + g.time : ''}
                     </p>
                   </div>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{g.gameType || 'Game'}</span>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded shrink-0">{g.gameType || 'Game'}</span>
+                  <ChevronRight size={14} className="text-gray-300 shrink-0" />
                 </li>
               ))}
             </ul>
@@ -100,6 +104,25 @@ export default function App() {
     setPage(p)
   }
 
+  function handleFixtureSetup(fixture) {
+    const isLeague = fixture.gameType === 'League'
+    saveSetupDraft({
+      date:       fixture.date,
+      gameType:   fixture.gameType || 'League',
+      weAreHome:  fixture.location === 'Home',
+      oppTeam:    isLeague ? fixture.opponent : '',
+      oppOther:   '',
+      oppFree:    isLeague ? '' : fixture.opponent,
+      tournamentName: '',
+      detailsOk:  false,
+      selected: [], ringers: [], playersOk: false,
+      order: [], orderOk: false,
+      dhBBH: '', dhSBH: '',
+      fieldingLineup: {}, fieldingOk: false,
+    })
+    setPage(P.SETUP)
+  }
+
   function handleGameStart(setup) {
     setCurrentSetup(setup)
     setSavedState(null)
@@ -141,7 +164,7 @@ export default function App() {
 
   return (
     <>
-      {page === P.HOME       && <HomePage onNav={handleNav} />}
+      {page === P.HOME       && <HomePage onNav={handleNav} onFixtureClick={handleFixtureSetup} />}
       {page === P.ADMIN      && <AdminPage onBack={() => setPage(P.HOME)} />}
       {page === P.SETUP      && <GameSetupPage onStart={handleGameStart} onBack={() => setPage(P.HOME)} />}
       {page === P.TRACKER    && currentSetup && (
