@@ -199,13 +199,16 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       setPendingHitLoc(null)
       setShowHitLoc(true)
     } else if (code === 'K') {
-      const catcher = setup.fieldingLineup?.['C']
+      // Only credit our catcher when we're fielding (opponent batting and K'd).
+      // When WE bat and strike out, the opposing catcher made the out — we don't track them.
+      const catcher = !isOurBatting ? setup.fieldingLineup?.['C'] : null
       const extraLog = catcher
         ? [{ type: 'putout', fielder: catcher, assister: null, inning: gs.inning, half: gs.half, outCode: code, batter }]
         : []
       setLastAction({ code, batter, rbi: 0, autoFielder: catcher || null, fielder: null, assister: null })
       finishOutcome(code, extraLog)
-    } else if (code === 'G' || code === 'F') {
+    } else if ((code === 'G' || code === 'F') && !isOurBatting) {
+      // Putout modal only when WE are fielding — credit our fielder.
       setPendingOutCode(code)
       setShowPutout(true)
     } else {
@@ -221,8 +224,8 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     setPendingHitCode(null)
     setPendingHitLoc(location)
 
-    if (code === 'G' || code === 'F' || code === 'FC') {
-      // Still need fielder attribution after location
+    if ((code === 'G' || code === 'F' || code === 'FC') && !isOurBatting) {
+      // Still need fielder attribution after location — only when we're fielding
       setPendingOutCode(code)
       setShowPutout(true)
     } else {
