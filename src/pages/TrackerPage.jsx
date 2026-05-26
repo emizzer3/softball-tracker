@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RotateCcw, RotateCw, Users, MapPin, AlertTriangle, BookOpen, X, StopCircle, ChevronLeft } from 'lucide-react'
+import { RotateCcw, RotateCw, Users, MapPin, AlertTriangle, BookOpen, X, StopCircle, ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import BaseDiamond from '../components/BaseDiamond'
 import { setActiveGame, getRoster } from '../storage'
 
@@ -560,22 +560,44 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       {/* ── BATTING HALF (our team batting) ─────────────────────── */}
       {isOurBatting && (
         <>
-          {/* Current batter */}
-          <div className="card mb-3 text-center">
-            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Now Batting</p>
-            <p className="text-2xl font-black">{batter}</p>
-            <div className="flex items-center justify-center gap-2 mt-1">
-              <span className={`text-sm font-semibold ${batterType === 'BBH' ? 'text-blue-600' : 'text-amber-600'}`}>
-                {batterType}
-              </span>
-              {batterPosition && (
-                <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded">
-                  {batterPosition}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-gray-400 mt-1">#{(gs.batterIndex % battingOrder.length) + 1} in order</p>
-          </div>
+          {/* Current batter + on-deck */}
+          {(() => {
+            const onDeck = battingOrder[(gs.batterIndex + 1) % battingOrder.length]
+            const inHole = battingOrder[(gs.batterIndex + 2) % battingOrder.length]
+            const onDeckType = setup.roster.find(p => p.name === onDeck)?.type
+            const inHoleType = setup.roster.find(p => p.name === inHole)?.type
+            return (
+              <div className="card mb-3 text-center">
+                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Now Batting</p>
+                <p className="text-2xl font-black">{batter}</p>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <span className={`text-sm font-semibold ${batterType === 'BBH' ? 'text-blue-600' : 'text-amber-600'}`}>
+                    {batterType}
+                  </span>
+                  {batterPosition && (
+                    <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded">
+                      {batterPosition}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">#{(gs.batterIndex % battingOrder.length) + 1} in order</p>
+
+                {/* Up next — on deck + in the hole, dimmed */}
+                <div className="flex justify-center gap-4 mt-3 pt-3 border-t border-gray-100">
+                  <div className="text-left">
+                    <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">On Deck</p>
+                    <p className="text-sm font-semibold text-gray-500">{onDeck}</p>
+                    <span className={`text-[10px] font-semibold ${onDeckType === 'BBH' ? 'text-blue-400' : 'text-amber-400'}`}>{onDeckType}</span>
+                  </div>
+                  <div className="text-left border-l border-gray-100 pl-4">
+                    <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">In the Hole</p>
+                    <p className="text-sm font-semibold text-gray-400">{inHole}</p>
+                    <span className={`text-[10px] font-semibold ${inHoleType === 'BBH' ? 'text-blue-300' : 'text-amber-300'}`}>{inHoleType}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Outcome buttons + guide link */}
           <div className="mb-1 flex items-center justify-between">
@@ -651,7 +673,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
         </div>
       )}
 
-      {lastAction && <LastPlayCard action={lastAction} onUndo={undo} />}
+      {lastAction && <LastPlayCard action={lastAction} atBats={gs.atBats} playLog={gs.playLog} onUndo={undo} />}
 
       {/* Error logging — only meaningful when WE are fielding */}
       {!isOurBatting && (
@@ -918,55 +940,108 @@ const OUTCOME_META = {
   'SAC': { label: 'Sacrifice',        bg: 'bg-gray-50',   border: 'border-gray-300',  text: 'text-gray-600'  },
 }
 
-function LastPlayCard({ action, onUndo }) {
+function LastPlayCard({ action, atBats, playLog, onUndo }) {
+  const [expanded, setExpanded] = useState(false)
   const meta = OUTCOME_META[action.code] || { label: action.code, bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' }
   const isOut = ['K','F','G','FC','SAC'].includes(action.code)
 
+  // Build the chronological history. At-bats are timestamped via id (Date.now).
+  // Newest first.
+  const history = [...(atBats || [])].sort((a, b) => b.id - a.id)
+  // Build putout/error lookup keyed by batter+inning+half for fielding annotation
+  const putoutFor = ab => (playLog || []).find(p =>
+    p.type === 'putout' && p.batter === ab.batter && p.inning === ab.inning && p.half === ab.half
+  )
+
   return (
-    <div className={`rounded-lg border-l-4 ${meta.border} ${meta.bg} p-3 mb-3 flex gap-3 items-start`}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`font-black text-lg ${meta.text}`}>{action.code}</span>
-          <span className="text-sm font-semibold text-gray-700">{action.batter}</span>
-          <span className="text-xs text-gray-500">{meta.label}</span>
-          {action.rbi > 0 && (
-            <span className="text-xs bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">
-              {action.rbi} RBI
-            </span>
+    <div className={`rounded-lg border-l-4 ${meta.border} ${meta.bg} mb-3`}>
+      {/* Summary row (latest play) */}
+      <div className="p-3 flex gap-3 items-start">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`font-black text-lg ${meta.text}`}>{action.code}</span>
+            <span className="text-sm font-semibold text-gray-700">{action.batter}</span>
+            <span className="text-xs text-gray-500">{meta.label}</span>
+            {action.rbi > 0 && (
+              <span className="text-xs bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">
+                {action.rbi} RBI
+              </span>
+            )}
+          </div>
+
+          {isOut && (
+            <div className="mt-1 text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
+              {action.autoFielder ? (
+                <>
+                  <span className="bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
+                  <span>{action.autoFielder}</span>
+                  <span className="text-gray-400 italic">(auto — catcher)</span>
+                </>
+              ) : action.fielder ? (
+                <>
+                  <span className="bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
+                  <span>{action.fielder}</span>
+                  {action.assister && (
+                    <>
+                      <span className="text-gray-300">·</span>
+                      <span className="bg-amber-100 text-amber-600 font-semibold px-1.5 py-0.5 rounded">A</span>
+                      <span>{action.assister}</span>
+                    </>
+                  )}
+                </>
+              ) : (
+                <span className="italic text-gray-400">Fielding not recorded</span>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Fielding line */}
-        {isOut && (
-          <div className="mt-1 text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
-            {action.autoFielder ? (
-              <>
-                <span className="bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
-                <span>{action.autoFielder}</span>
-                <span className="text-gray-400 italic">(auto — catcher)</span>
-              </>
-            ) : action.fielder ? (
-              <>
-                <span className="bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
-                <span>{action.fielder}</span>
-                {action.assister && (
-                  <>
-                    <span className="text-gray-300">·</span>
-                    <span className="bg-amber-100 text-amber-600 font-semibold px-1.5 py-0.5 rounded">A</span>
-                    <span>{action.assister}</span>
-                  </>
-                )}
-              </>
-            ) : (
-              <span className="italic text-gray-400">Fielding not recorded</span>
-            )}
-          </div>
-        )}
+        <button onClick={onUndo} className="btn btn-ghost btn-sm p-1 text-gray-400 shrink-0" title="Undo">
+          <RotateCcw size={15} />
+        </button>
       </div>
 
-      <button onClick={onUndo} className="btn btn-ghost btn-sm p-1 text-gray-400 shrink-0" title="Undo">
-        <RotateCcw size={15} />
-      </button>
+      {/* Expand toggle */}
+      {history.length > 1 && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="w-full border-t border-gray-200/60 px-3 py-1.5 text-xs text-gray-500 hover:bg-black/5 flex items-center justify-center gap-1"
+        >
+          {expanded ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
+          {expanded ? 'Hide' : `Show all ${history.length} plays`}
+        </button>
+      )}
+
+      {/* Expanded list */}
+      {expanded && (
+        <div className="border-t border-gray-200/60 max-h-60 overflow-y-auto bg-white/50">
+          <ul className="divide-y divide-gray-100">
+            {history.map(ab => {
+              const m = OUTCOME_META[ab.outcome] || { text: 'text-gray-700' }
+              const po = putoutFor(ab)
+              return (
+                <li key={ab.id} className="px-3 py-1.5 text-xs flex items-center gap-2">
+                  <span className="text-gray-400 font-mono text-[10px] w-12 shrink-0">
+                    {ab.inning}{ab.half === 'top' ? '▲' : '▼'}
+                  </span>
+                  <span className={`font-black ${m.text} w-8 shrink-0`}>{ab.outcome}</span>
+                  <span className="font-medium text-gray-700 flex-1 truncate">{ab.batter}</span>
+                  {ab.rbi > 0 && (
+                    <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-1 py-0.5 rounded shrink-0">
+                      {ab.rbi} RBI
+                    </span>
+                  )}
+                  {po && (
+                    <span className="text-[10px] text-gray-400 shrink-0">
+                      {po.fielder}{po.assister ? `·${po.assister}` : ''}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
