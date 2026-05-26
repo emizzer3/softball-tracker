@@ -56,7 +56,7 @@ export default function GameSetupPage({ onStart, onBack }) {
   const [oppOther,       setOppOther]       = useState(() => draft?.oppOther       ?? '')
   const [oppFree,        setOppFree]        = useState(() => draft?.oppFree        ?? '')
   const [tournamentName, setTournamentName] = useState(() => draft?.tournamentName ?? '')
-  const [innings,        setInnings]        = useState(() => draft?.innings        ?? 7)
+  const [innings]        = useState(7) // always 7 for league/friendly; tournaments use 99
   const [detailsOk,      setDetailsOk]      = useState(() => draft?.detailsOk     ?? false)
   const [detailsErr,     setDetailsErr]     = useState('')
 
@@ -193,7 +193,7 @@ export default function GameSetupPage({ onStart, onBack }) {
       date, gameType,
       tournamentName: isTournament ? tournamentName.trim() : '',
       home, away, weAreHome,
-      innings:  isTournament ? 99 : innings,
+      innings:  isTournament ? 99 : 7,
       timed:    isTournament,
       battingOrder: order,
       roster: gameRoster,
@@ -324,20 +324,10 @@ export default function GameSetupPage({ onStart, onBack }) {
             )}
           </div>
 
-          {isTournament ? (
+          {isTournament && (
             <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
               <span className="text-lg">⏱</span>
               <p className="text-sm text-indigo-700 font-medium">Timed game — call it early when time runs out</p>
-            </div>
-          ) : (
-            <div>
-              <label className="label">Innings</label>
-              <div className="flex gap-2">
-                {[7,9].map(n => (
-                  <button key={n} onClick={() => setInnings(n)}
-                    className={`btn btn-sm px-4 ${innings === n ? 'btn-primary' : 'btn-ghost'}`}>{n}</button>
-                ))}
-              </div>
             </div>
           )}
           {detailsErr && <p className="text-red-600 text-sm flex gap-1"><AlertCircle size={14} className="shrink-0 mt-0.5" />{detailsErr}</p>}
