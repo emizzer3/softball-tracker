@@ -106,14 +106,21 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   function finishOutcome(code, extraPlayLog = [], hitLocation = null) {
     const snapshot = { ...gs }  // full pre-action snapshot for undo
     const by = BASES_ON_OUTCOME[code] || 0
-    const isOut = ['K','F','G','SAC'].includes(code)
+    const isOut = ['K','F','G','SAC','FC'].includes(code)
     const scoringTeam = gs.half === 'top' ? 'away' : 'home'
     const g = { ...gs, balls: 0, strikes: 0 }
 
     let newBases = [...g.bases]
     let runs = 0
 
-    if (by > 0) {
+    if (code === 'FC') {
+      // Fielder's Choice: lead runner is forced out, batter safe at 1B
+      // (one out is recorded via isOut; other runners stay put)
+      for (let i = 2; i >= 0; i--) {
+        if (newBases[i]) { newBases[i] = false; break }
+      }
+      newBases[0] = true
+    } else if (by > 0) {
       const [advanced, r] = basesAdvanced(newBases, by)
       runs = r
       newBases = advanced
@@ -214,7 +221,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     setPendingHitCode(null)
     setPendingHitLoc(location)
 
-    if (code === 'G' || code === 'F') {
+    if (code === 'G' || code === 'F' || code === 'FC') {
       // Still need fielder attribution after location
       setPendingOutCode(code)
       setShowPutout(true)
@@ -400,10 +407,10 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
           : 'bg-orange-100 border-orange-400'
       }`}>
         {isOurBatting ? (
-          <p className="font-bold text-green-800 text-sm">⚾ {setup.home} batting</p>
+          <p className="font-bold text-green-800 text-sm">⚾ {gs.half === 'top' ? setup.away : setup.home} batting</p>
         ) : (
           <>
-            <p className="font-black text-orange-900">🛡️ FIELDING — {setup.away} batting</p>
+            <p className="font-black text-orange-900">🛡️ FIELDING — {gs.half === 'top' ? setup.away : setup.home} batting</p>
             <p className="text-xs text-orange-700 mt-0.5">Tap OUT or RUN below to track their half-inning</p>
           </>
         )}
@@ -412,14 +419,14 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       {/* Score bar */}
       <div className="card mb-3 p-3">
         <div className="flex justify-between items-center text-sm font-semibold text-gray-500 mb-1">
-          <span className={!isOurBatting ? 'text-orange-600 font-bold' : ''}>{setup.away}</span>
+          <span className={gs.half === 'top' ? (isOurBatting ? 'text-green-700 font-bold' : 'text-orange-600 font-bold') : ''}>{setup.away}</span>
           <span className="text-xs">
             Inning {gs.inning} {gs.half === 'top' ? '▲' : '▼'}
             {setup.timed
               ? <span className="ml-1 bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded text-xs">⏱ TIMED</span>
               : ` of ${setup.innings}`}
           </span>
-          <span className={isOurBatting ? 'text-green-700 font-bold' : ''}>{setup.home}</span>
+          <span className={gs.half === 'bottom' ? (isOurBatting ? 'text-green-700 font-bold' : 'text-orange-600 font-bold') : ''}>{setup.home}</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-4xl font-black">{gs.awayScore}</span>
@@ -493,7 +500,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
             >
               <span className="text-3xl">🏃</span>
               <span className="font-black text-lg">RUN</span>
-              <span className="text-xs opacity-80">+1 for {setup.away}</span>
+              <span className="text-xs opacity-80">+1 for {gs.half === 'top' ? setup.away : setup.home}</span>
             </button>
           </div>
           <p className="text-xs text-gray-400 text-center">3 outs ends the half-inning · use outcome buttons below for detail</p>
@@ -688,7 +695,7 @@ function PutoutModal({ outCode, battingOrder, playerPositions, onConfirm, onSkip
     pos: playerPositions?.[name] || '?',
   }))
 
-  const label = outCode === 'G' ? 'Groundout' : 'Flyout'
+  const label = outCode === 'G' ? 'Groundout' : outCode === 'FC' ? "Fielder's Choice" : 'Flyout'
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end z-50">
@@ -777,7 +784,7 @@ const OUTCOME_META = {
 
 function LastPlayCard({ action, onUndo }) {
   const meta = OUTCOME_META[action.code] || { label: action.code, bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' }
-  const isOut = ['K','F','G'].includes(action.code)
+  const isOut = ['K','F','G','FC','SAC'].includes(action.code)
 
   return (
     <div className={`rounded-lg border-l-4 ${meta.border} ${meta.bg} p-3 mb-3 flex gap-3 items-start`}>
