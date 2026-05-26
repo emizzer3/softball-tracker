@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RotateCcw, Users, MapPin, AlertTriangle, BookOpen, X, StopCircle, ChevronLeft } from 'lucide-react'
+import { RotateCcw, RotateCw, Users, MapPin, AlertTriangle, BookOpen, X, StopCircle, ChevronLeft } from 'lucide-react'
 import BaseDiamond from '../components/BaseDiamond'
 import { setActiveGame, getRoster } from '../storage'
 
@@ -81,7 +81,10 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   const [showPutout, setShowPutout] = useState(false)
   const [pendingOutCode, setPendingOutCode] = useState(null)
   const [showGuide, setShowGuide] = useState(false)
-  const [prevGs, setPrevGs] = useState(null) // snapshot for undo
+  // Multi-step undo / redo — full state snapshots, capped at HISTORY_LIMIT
+  const HISTORY_LIMIT = 30
+  const [history,    setHistory]    = useState(() => savedState?.history    || [])
+  const [redoStack,  setRedoStack]  = useState(() => savedState?.redoStack  || [])
   const [showHitLoc, setShowHitLoc] = useState(false)
   const [pendingHitCode, setPendingHitCode] = useState(null)
   const [pendingHitLoc, setPendingHitLoc] = useState(null)
@@ -94,9 +97,44 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   const batterPosition = setup.playerPositions?.[batter]
   const batterType = setup.roster.find(p => p.name === batter)?.type
 
-  function persist(newGs) {
-    setActiveGame({ setup, gameState: newGs, battingOrder })
+  // Persist a new game state — pushes the OLD state to history and clears redo by default.
+  // Pass { skipHistory: true } from undo/redo so they don't pollute their own stacks.
+  function persist(newGs, { skipHistory = false } = {}) {
+    if (skipHistory) {
+      setActiveGame({ setup, gameState: newGs, battingOrder, history, redoStack })
+      setGs(newGs)
+      return
+    }
+    const newHistory   = [...history, gs].slice(-HISTORY_LIMIT)
+    const newRedoStack = []
+    setHistory(newHistory)
+    setRedoStack(newRedoStack)
+    setActiveGame({ setup, gameState: newGs, battingOrder, history: newHistory, redoStack: newRedoStack })
     setGs(newGs)
+  }
+
+  function undo() {
+    if (history.length === 0) return
+    const prev = history[history.length - 1]
+    const newHistory   = history.slice(0, -1)
+    const newRedoStack = [...redoStack, gs].slice(-HISTORY_LIMIT)
+    setHistory(newHistory)
+    setRedoStack(newRedoStack)
+    setActiveGame({ setup, gameState: prev, battingOrder, history: newHistory, redoStack: newRedoStack })
+    setGs(prev)
+    setLastAction(null)
+  }
+
+  function redo() {
+    if (redoStack.length === 0) return
+    const next = redoStack[redoStack.length - 1]
+    const newRedoStack = redoStack.slice(0, -1)
+    const newHistory   = [...history, gs].slice(-HISTORY_LIMIT)
+    setHistory(newHistory)
+    setRedoStack(newRedoStack)
+    setActiveGame({ setup, gameState: next, battingOrder, history: newHistory, redoStack: newRedoStack })
+    setGs(next)
+    setLastAction(null)
   }
 
   // Ball-in-play outcomes that prompt for a hit location
@@ -104,7 +142,6 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
 
   // Core outcome logic — separated so it can be called with optional playLog extras
   function finishOutcome(code, extraPlayLog = [], hitLocation = null) {
-    const snapshot = { ...gs }  // full pre-action snapshot for undo
     const by = BASES_ON_OUTCOME[code] || 0
     const isOut = ['K','F','G','SAC','FC'].includes(code)
     const scoringTeam = gs.half === 'top' ? 'away' : 'home'
@@ -188,7 +225,6 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     g.batterIndex = g.done ? g.batterIndex : (g.batterIndex + 1) % battingOrder.length
 
     setLastAction(prev => ({ ...prev, code, batter, rbi: runs }))
-    setPrevGs(snapshot)
     persist(g)
   }
 
@@ -264,15 +300,6 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     persist(g)
   }
 
-  function undoLast() {
-    if (!prevGs || !lastAction) return
-    // Restore full pre-action state: score, bases, outs, inning, atBats, playLog, everything
-    setActiveGame({ setup, gameState: prevGs, battingOrder })
-    setGs(prevGs)
-    setPrevGs(null)
-    setLastAction(null)
-  }
-
   function doSub() {
     if (!subFrom || !subTo || subFrom === subTo) return
     const newOrder = battingOrder.map(n => n === subFrom ? subTo : n)
@@ -291,7 +318,6 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
 
   // Simplified fielding-half helpers — used when opponents are batting (top of inning)
   function recordOpponentOut() {
-    const snapshot = { ...gs }
     const g = { ...gs, balls: 0, strikes: 0 }
     g.outs++
     if (g.outs >= 3) {
@@ -314,7 +340,6 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
         }
       }
     }
-    setPrevGs(snapshot)
     persist(g)
   }
 
@@ -584,21 +609,54 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
         </button>
       </div>
 
-      {lastAction && <LastPlayCard action={lastAction} onUndo={undoLast} />}
-
-      {/* Error logging */}
-      <div className="card mb-3 p-3">
-        <p className="text-xs font-semibold text-gray-500 mb-1 flex items-center gap-1">
-          <AlertTriangle size={12} /> LOG FIELDING ERROR — tap the player who made the error
-        </p>
-        <p className="text-xs text-gray-400 mb-2">Use this when a batter reaches base (or advances) due to a fielder's mistake.</p>
-        <div className="flex flex-wrap gap-1">
-          {battingOrder.map(name => (
-            <button key={name} onClick={() => addError(name)}
-              className="btn btn-ghost btn-sm text-xs">{name}</button>
-          ))}
+      {/* Undo/Redo toolbar — visible whenever there's something to undo or redo */}
+      {(history.length > 0 || redoStack.length > 0) && (
+        <div className="flex gap-2 mb-3">
+          <button
+            onClick={undo}
+            disabled={history.length === 0}
+            className="btn btn-ghost btn-sm flex-1 gap-1 border border-gray-200 disabled:opacity-40"
+          >
+            <RotateCcw size={14} /> Undo {history.length > 1 ? `(${history.length})` : ''}
+          </button>
+          <button
+            onClick={redo}
+            disabled={redoStack.length === 0}
+            className="btn btn-ghost btn-sm flex-1 gap-1 border border-gray-200 disabled:opacity-40"
+          >
+            <RotateCw size={14} /> Redo {redoStack.length > 1 ? `(${redoStack.length})` : ''}
+          </button>
         </div>
-      </div>
+      )}
+
+      {lastAction && <LastPlayCard action={lastAction} onUndo={undo} />}
+
+      {/* Error logging — only meaningful when WE are fielding */}
+      {!isOurBatting && (
+        <div className="card mb-3 p-3 border-2 border-amber-200 bg-amber-50">
+          <p className="text-sm font-bold text-amber-800 mb-1 flex items-center gap-1">
+            <AlertTriangle size={14} /> Did one of our fielders mess up?
+          </p>
+          <p className="text-xs text-amber-700 mb-2">
+            Tap the fielder who made the error. This adds a fielding error (E) to their stats — use it independently of the OUT/RUN buttons above.
+          </p>
+          <div className="grid grid-cols-3 gap-1">
+            {battingOrder.map(name => {
+              const pos = setup.playerPositions?.[name] || '—'
+              return (
+                <button
+                  key={name}
+                  onClick={() => addError(name)}
+                  className="btn btn-sm bg-white border border-amber-300 hover:bg-amber-100 active:bg-amber-200 text-amber-900 flex flex-col h-auto py-1.5 gap-0"
+                >
+                  <span className="text-xs font-black leading-tight">{pos}</span>
+                  <span className="text-xs leading-tight">{name.split(' ')[0]}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Putout modal — shown after G or F */}
       {showPutout && (

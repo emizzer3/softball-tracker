@@ -152,14 +152,16 @@ export default function App() {
   const showNav = ![P.SCORESHEET, P.SUMMARY].includes(page)
 
   function handleTrackerTab() {
-    if (currentSetup) {
+    // Always re-read the freshest active game from localStorage so the tracker
+    // resumes from the latest play, even if the user navigated away mid-game.
+    const fresh = getActiveGame()
+    if (fresh) {
+      setCurrentSetup(fresh.setup)
+      setSavedState(fresh)
       setPage(P.TRACKER)
-    } else if (activeGame) {
-      setCurrentSetup(activeGame.setup)
-      setSavedState(activeGame)
+    } else if (currentSetup) {
       setPage(P.TRACKER)
     } else {
-      // No game ready — send them to setup
       setPage(P.SETUP)
     }
   }
