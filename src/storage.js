@@ -11,8 +11,8 @@ const K = {
 }
 
 const DEFAULT_TEAMS = [
-  'The Renegades', 'Bristol Bulls', 'Buccs Whizz',
-  'Easton Cowfolk', 'Flyers', 'Underarm Tossers',
+  'Buccs Whizz', 'Victorious Secret', 'Vandals',
+  'Grandslammers', 'Archway', 'BAM!', 'Monkeys',
 ]
 
 function get(key, fallback) {
@@ -28,22 +28,23 @@ function set(key, value) {
 
 // ── Roster ────────────────────────────────────────────────────
 const DEFAULT_ROSTER = [
-  { id: 'luke',      name: 'Luke',      type: 'BBH', active: true },
-  { id: 'caoimhe',   name: 'Caoimhe',   type: 'SBH', active: true },
+  // BBH
   { id: 'matt',      name: 'Matt',      type: 'BBH', active: true },
   { id: 'jeremy',    name: 'Jeremy',    type: 'BBH', active: true },
   { id: 'arthur',    name: 'Arthur',    type: 'BBH', active: true },
-  { id: 'charlotte', name: 'Charlotte', type: 'SBH', active: true },
   { id: 'lewis',     name: 'Lewis',     type: 'BBH', active: true },
-  { id: 'emily',     name: 'Emily',     type: 'SBH', active: true },
-  { id: 'becky',     name: 'Becky',     type: 'SBH', active: true },
-  { id: 'jack',      name: 'Jack',      type: 'BBH', active: true },
   { id: 'sam',       name: 'Sam',       type: 'BBH', active: true },
   { id: 'karl',      name: 'Karl',      type: 'BBH', active: true },
-  { id: 'gavin',     name: 'Gavin',     type: 'BBH', active: true },
-  { id: 'becci',     name: 'Becci',     type: 'SBH', active: true },
+  { id: 'alex',      name: 'Alex',      type: 'BBH', active: true },
+  { id: 'omar',      name: 'Omar',      type: 'BBH', active: true },
+  // SBH
+  { id: 'caoimhe',   name: 'Caoimhe',   type: 'SBH', active: true },
+  { id: 'charlotte', name: 'Charlotte', type: 'SBH', active: true },
+  { id: 'emily',     name: 'Emily',     type: 'SBH', active: true },
+  { id: 'becky',     name: 'Becky',     type: 'SBH', active: true },
+  { id: 'woody',     name: 'Woody',     type: 'SBH', active: true },
   { id: 'emma',      name: 'Emma',      type: 'SBH', active: true },
-  { id: 'sarah',     name: 'Sarah',     type: 'SBH', active: true },
+  { id: 'zara',      name: 'Zara',      type: 'SBH', active: true },
 ]
 
 export function getRoster() { return get(K.ROSTER, DEFAULT_ROSTER) }
@@ -75,7 +76,7 @@ export function setPin(pin) { set(K.PIN, pin) }
 export function checkPin(pin) { return pin === getPin() }
 
 // ── League settings ───────────────────────────────────────────
-export function getDivision() { return get(K.DIVISION, '') }
+export function getDivision() { return get(K.DIVISION, 'Bristol Division 2') }
 export function setDivision(name) { set(K.DIVISION, name) }
 
 export function getTeams() { return get(K.TEAMS, DEFAULT_TEAMS) }
