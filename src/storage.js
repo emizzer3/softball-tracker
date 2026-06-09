@@ -155,6 +155,7 @@ export function exportAllData() {
     teams:       getTeams(),
     tournaments: getTournaments(),
     schedule:    getSchedule(),
+    teamConfig:  getTeamConfig(),
   }
 }
 
@@ -168,6 +169,7 @@ export function importAllData(data) {
   saveTeams(         data.teams       || DEFAULT_TEAMS)
   set(K.TOURNAMENTS, data.tournaments || [])
   if (data.schedule) saveSchedule(data.schedule)
+  if (data.teamConfig) setTeamConfig(data.teamConfig)
 }
 
 // ── Season stats (derived, not stored — computed from games) ──
