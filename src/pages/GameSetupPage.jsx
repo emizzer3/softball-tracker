@@ -112,7 +112,7 @@ export default function GameSetupPage({ draftKey = 'default', onStart, onBack })
   function confirmDetails() {
     if (!gameType) { setDetailsErr('Select a game type'); return }
     if (!opponent.trim()) { setDetailsErr('Enter opponent team'); return }
-    if (opponent.trim() === OUR_TEAM) { setDetailsErr("Opponent can't also be The Renegades"); return }
+    if (opponent.trim() === OUR_TEAM) { setDetailsErr(`Opponent can't also be ${OUR_TEAM || 'your team'}`); return }
     if (gameType === 'Tournament' && !tournamentName.trim()) { setDetailsErr('Enter a tournament name'); return }
     if (gameType === 'Tournament') rememberTournament(tournamentName.trim())
     setDetailsErr(''); setDetailsOk(true)
@@ -292,7 +292,7 @@ export default function GameSetupPage({ draftKey = 'default', onStart, onBack })
 
           {/* Home/Away toggle */}
           <div>
-            <label className="label">Are The Renegades home or away?</label>
+            <label className="label">Are {OUR_TEAM || 'your team'} home or away?</label>
             <div className="flex gap-2">
               <button type="button"
                 onClick={() => { setWeAreHome(true); setDetailsOk(false) }}

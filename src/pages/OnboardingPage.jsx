@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { setTeamConfig, setPin } from '../storage'
+import { setTeamConfig, setPin, setDivision } from '../storage'
 
 export default function OnboardingPage({ onComplete }) {
   const [teamName, setTeamName] = useState('')
@@ -20,6 +20,7 @@ export default function OnboardingPage({ onComplete }) {
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setTeamConfig({ name: teamName.trim(), division: division.trim(), setupComplete: true })
+    setDivision(division.trim())
     setPin(pin)
     onComplete()
   }

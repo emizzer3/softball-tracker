@@ -120,21 +120,25 @@ function HomePage({ onNav, onFixtureClick }) {
   )
 }
 
+// Auto-migrate existing installs: if roster data exists but no team config,
+// silently create the Renegades config so the onboarding wizard is skipped.
+// Must be a pure module-level function (not inline) to satisfy React's rules
+// for useState lazy initializers (no side effects inside the initializer).
+function initAndMigrate() {
+  const hasRoster = localStorage.getItem('sft_roster') !== null
+  const hasTeam = localStorage.getItem('sft_team') !== null
+  if (hasRoster && !hasTeam) {
+    setTeamConfig({
+      name: 'The Renegades',
+      division: getDivision() || 'Bristol Division 2',
+      setupComplete: true,
+    })
+  }
+  return !!getTeamConfig()?.setupComplete
+}
+
 export default function App() {
-  // Auto-migrate existing installs: if roster data exists but no team config,
-  // silently create the Renegades config so the onboarding wizard is skipped.
-  const [onboarded, setOnboarded] = useState(() => {
-    const hasRoster = localStorage.getItem('sft_roster') !== null
-    const hasTeam = localStorage.getItem('sft_team') !== null
-    if (hasRoster && !hasTeam) {
-      setTeamConfig({
-        name: 'The Renegades',
-        division: getDivision() || 'Bristol Division 2',
-        setupComplete: true,
-      })
-    }
-    return !!getTeamConfig()?.setupComplete
-  })
+  const [onboarded, setOnboarded] = useState(initAndMigrate)
 
   if (!onboarded) {
     return <OnboardingPage onComplete={() => setOnboarded(true)} />
