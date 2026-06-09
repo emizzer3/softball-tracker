@@ -5,7 +5,8 @@ import TrackerPage from './pages/TrackerPage'
 import ScoresheetPage from './pages/ScoresheetPage'
 import SummaryPage from './pages/SummaryPage'
 import SeasonStatsPage from './pages/SeasonStatsPage'
-import { saveGame, getActiveGame, clearActiveGame, getSchedule, saveSetupDraft, getSetupDraft, getAllSetupDrafts } from './storage'
+import OnboardingPage from './pages/OnboardingPage'
+import { saveGame, getActiveGame, clearActiveGame, getSchedule, saveSetupDraft, getSetupDraft, getAllSetupDrafts, getTeamConfig, setTeamConfig, getDivision } from './storage'
 import { Settings, Plus, BarChart2, CalendarDays, ChevronRight } from 'lucide-react'
 
 const P = { HOME: 'home', ADMIN: 'admin', SETUP: 'setup', TRACKER: 'tracker', SCORESHEET: 'scoresheet', SUMMARY: 'summary', SEASON: 'season' }
@@ -120,6 +121,25 @@ function HomePage({ onNav, onFixtureClick }) {
 }
 
 export default function App() {
+  // Auto-migrate existing installs: if roster data exists but no team config,
+  // silently create the Renegades config so the onboarding wizard is skipped.
+  const [onboarded, setOnboarded] = useState(() => {
+    const hasRoster = localStorage.getItem('sft_roster') !== null
+    const hasTeam = localStorage.getItem('sft_team') !== null
+    if (hasRoster && !hasTeam) {
+      setTeamConfig({
+        name: 'The Renegades',
+        division: getDivision() || 'Bristol Division 2',
+        setupComplete: true,
+      })
+    }
+    return !!getTeamConfig()?.setupComplete
+  })
+
+  if (!onboarded) {
+    return <OnboardingPage onComplete={() => setOnboarded(true)} />
+  }
+
   const [page, setPage] = useState(P.HOME)
   const [currentSetup, setCurrentSetup] = useState(null)
   const [savedState, setSavedState] = useState(null)
