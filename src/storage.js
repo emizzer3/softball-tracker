@@ -8,6 +8,7 @@ const K = {
   TEAMS:       'sft_teams',
   TOURNAMENTS: 'sft_tournaments',
   SCHEDULE:    'sft_schedule',
+  TEAM:        'sft_team',
 }
 
 const DEFAULT_TEAMS = [
@@ -288,3 +289,9 @@ export function getSeasonRecord() {
     { W: 0, L: 0, D: 0 }
   )
 }
+
+// ── Team config ───────────────────────────────────────────────
+// Shape: { name: string, division: string, setupComplete: boolean }
+// Phase 2 will extend this with { teamId: string, shortId: string }
+export function getTeamConfig() { return get(K.TEAM, null) }
+export function setTeamConfig(config) { set(K.TEAM, config) }
