@@ -144,7 +144,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   const BALL_IN_PLAY = ['1B','2B','3B','HR','F','G','E','FC','SAC']
 
   // Core outcome logic — separated so it can be called with optional playLog extras
-  function finishOutcome(code, extraPlayLog = [], hitLocation = null, sacRuns = 0, doublePlay = false) {
+  function finishOutcome(code, extraPlayLog = [], hitLocation = null, sacRuns = 0, doublePlay = false, triplePlay = false) {
     const by = BASES_ON_OUTCOME[code] || 0
     const isOut = ['K','F','G','SAC','FC'].includes(code)
     const scoringTeam = gs.half === 'top' ? 'away' : 'home'
@@ -238,7 +238,8 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
 
     if (isOut) {
       g.outs++
-      if (doublePlay) g.outs++ // second out from the DP
+      if (doublePlay || triplePlay) g.outs++ // second out from the DP/TP
+      if (triplePlay) g.outs++              // third out from the TP
       if (g.outs >= 3) {
         newBases = [false, false, false]
         g.outs = 0
@@ -331,12 +332,12 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     setShowSacRuns(false)
   }
 
-  function completePutout(fielder, assister, doublePlay = false) {
+  function completePutout(fielder, assister, doublePlay = false, triplePlay = false) {
     const extraLog = fielder
-      ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter, doublePlay }]
+      ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter, doublePlay, triplePlay }]
       : []
-    setLastAction({ code: pendingOutCode, batter, rbi: 0, fielder: fielder || null, assister: assister || null, autoFielder: null, doublePlay })
-    finishOutcome(pendingOutCode, extraLog, pendingHitLoc, 0, doublePlay)
+    setLastAction({ code: pendingOutCode, batter, rbi: 0, fielder: fielder || null, assister: assister || null, autoFielder: null, doublePlay, triplePlay })
+    finishOutcome(pendingOutCode, extraLog, pendingHitLoc, 0, doublePlay, triplePlay)
     setPendingOutCode(null)
     setPendingHitLoc(null)
     setShowPutout(false)
@@ -914,6 +915,7 @@ function PutoutModal({ outCode, battingOrder, playerPositions, bases = [false,fa
   const [putoutPlayer, setPutoutPlayer] = useState('')
   const [assistPlayer, setAssistPlayer] = useState('')
   const [doublePlay, setDoublePlay] = useState(false)
+  const [triplePlay, setTriplePlay] = useState(false)
 
   const players = battingOrder.map(name => ({
     name,
@@ -923,6 +925,8 @@ function PutoutModal({ outCode, battingOrder, playerPositions, bases = [false,fa
   const label = outCode === 'G' ? 'Groundout' : outCode === 'FC' ? "Fielder's Choice" : 'Flyout'
   // DP only makes sense for ground balls / FC, and only when there's a runner who could be the 2nd out
   const canDP = (outCode === 'G' || outCode === 'FC') && bases.some(Boolean)
+  // TP needs at least 2 runners on base
+  const canTP = canDP && bases.filter(Boolean).length >= 2
   // When we're batting, hide the fielder selection (those would be opponent fielders we don't track)
   const showFielders = !hideFielders
 
@@ -984,30 +988,45 @@ function PutoutModal({ outCode, battingOrder, playerPositions, bases = [false,fa
           </div>
         )}
 
-        {/* Double-play toggle — only for FC/G with a runner on base */}
+        {/* Double-play / Triple-play toggles — only for FC/G with runners on base */}
         {canDP && (
-          <div className="mt-3 mb-3 p-2 border-2 border-dashed border-red-300 bg-red-50 rounded-lg">
+          <div className="mt-3 mb-3 p-2 border-2 border-dashed border-red-300 bg-red-50 rounded-lg space-y-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={doublePlay}
-                onChange={e => setDoublePlay(e.target.checked)}
+                checked={doublePlay || triplePlay}
+                onChange={e => {
+                  setDoublePlay(e.target.checked)
+                  if (!e.target.checked) setTriplePlay(false)
+                }}
                 className="w-4 h-4 accent-red-600"
               />
               <span className="text-sm font-bold text-red-700">⚡ Double Play</span>
-              <span className="text-xs text-red-600/80">— records a second out (the batter + lead runner)</span>
+              <span className="text-xs text-red-600/80">— records a second out</span>
             </label>
+            {canTP && (doublePlay || triplePlay) && (
+              <label className="flex items-center gap-2 cursor-pointer pl-6">
+                <input
+                  type="checkbox"
+                  checked={triplePlay}
+                  onChange={e => setTriplePlay(e.target.checked)}
+                  className="w-4 h-4 accent-red-800"
+                />
+                <span className="text-sm font-bold text-red-900">⚡⚡ Triple Play</span>
+                <span className="text-xs text-red-800/80">— records a third out</span>
+              </label>
+            )}
           </div>
         )}
 
         <div className="flex gap-2 mt-2">
           <button onClick={onSkip} className="btn btn-ghost btn-md flex-1">Skip</button>
           <button
-            onClick={() => onConfirm(putoutPlayer, assistPlayer, doublePlay)}
+            onClick={() => onConfirm(putoutPlayer, assistPlayer, doublePlay || triplePlay, triplePlay)}
             disabled={showFielders && !putoutPlayer}
             className="btn btn-success btn-md flex-1"
           >
-            ✓ Log {doublePlay ? 'Double ' : ''}Play
+            ✓ Log {triplePlay ? 'Triple ' : doublePlay ? 'Double ' : ''}Play
           </button>
         </div>
       </div>
