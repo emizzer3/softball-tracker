@@ -144,7 +144,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   const BALL_IN_PLAY = ['1B','2B','3B','HR','F','G','E','FC','SAC']
 
   // Core outcome logic — separated so it can be called with optional playLog extras
-  function finishOutcome(code, extraPlayLog = [], hitLocation = null, sacRuns = 0) {
+  function finishOutcome(code, extraPlayLog = [], hitLocation = null, sacRuns = 0, doublePlay = false) {
     const by = BASES_ON_OUTCOME[code] || 0
     const isOut = ['K','F','G','SAC','FC'].includes(code)
     const scoringTeam = gs.half === 'top' ? 'away' : 'home'
@@ -154,12 +154,17 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     let runs = 0
 
     if (code === 'FC') {
-      // Fielder's Choice: lead runner is forced out, batter safe at 1B
-      // (one out is recorded via isOut; other runners stay put)
+      // Fielder's Choice: lead runner is forced out.
+      // Normally batter is safe at 1B. On a double play, batter is also out.
       for (let i = 2; i >= 0; i--) {
         if (newBases[i]) { newBases[i] = false; break }
       }
-      newBases[0] = true
+      if (!doublePlay) newBases[0] = true
+    } else if (code === 'G' && doublePlay) {
+      // Ground-ball double play: batter is out (no base) + lead runner forced out
+      for (let i = 2; i >= 0; i--) {
+        if (newBases[i]) { newBases[i] = false; break }
+      }
     } else if (code === 'BB') {
       // Walk: only forced runners advance (chain from 1B). Co-ed rule:
       // BBH walks to 2B, SBH walks to 1B.
@@ -233,6 +238,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
 
     if (isOut) {
       g.outs++
+      if (doublePlay) g.outs++ // second out from the DP
       if (g.outs >= 3) {
         newBases = [false, false, false]
         g.outs = 0
@@ -302,6 +308,11 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       // Still need fielder attribution after location — only when we're fielding
       setPendingOutCode(code)
       setShowPutout(true)
+    } else if ((code === 'G' || code === 'FC') && isOurBatting && gs.bases.some(Boolean)) {
+      // We're batting and there's at least one runner — could be a double play.
+      // Show the putout modal but it'll hide the fielder grid (we don't track them).
+      setPendingOutCode(code)
+      setShowPutout(true)
     } else if (code === 'SAC') {
       // Always ask how many runners tagged up and scored
       setPendingSacLoc(location)
@@ -320,12 +331,12 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     setShowSacRuns(false)
   }
 
-  function completePutout(fielder, assister) {
+  function completePutout(fielder, assister, doublePlay = false) {
     const extraLog = fielder
-      ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter }]
+      ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter, doublePlay }]
       : []
-    setLastAction({ code: pendingOutCode, batter, rbi: 0, fielder: fielder || null, assister: assister || null, autoFielder: null })
-    finishOutcome(pendingOutCode, extraLog, pendingHitLoc)
+    setLastAction({ code: pendingOutCode, batter, rbi: 0, fielder: fielder || null, assister: assister || null, autoFielder: null, doublePlay })
+    finishOutcome(pendingOutCode, extraLog, pendingHitLoc, 0, doublePlay)
     setPendingOutCode(null)
     setPendingHitLoc(null)
     setShowPutout(false)
@@ -761,8 +772,10 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
           outCode={pendingOutCode}
           battingOrder={battingOrder}
           playerPositions={setup.playerPositions}
+          bases={gs.bases}
+          hideFielders={isOurBatting}
           onConfirm={completePutout}
-          onSkip={() => completePutout(null, null)}
+          onSkip={() => completePutout(null, null, false)}
         />
       )}
 
@@ -897,9 +910,10 @@ function SacRunsModal({ batter, bases, onConfirm }) {
 }
 
 // Bottom sheet: record who made a groundout or flyout
-function PutoutModal({ outCode, battingOrder, playerPositions, onConfirm, onSkip }) {
+function PutoutModal({ outCode, battingOrder, playerPositions, bases = [false,false,false], hideFielders = false, onConfirm, onSkip }) {
   const [putoutPlayer, setPutoutPlayer] = useState('')
   const [assistPlayer, setAssistPlayer] = useState('')
+  const [doublePlay, setDoublePlay] = useState(false)
 
   const players = battingOrder.map(name => ({
     name,
@@ -907,6 +921,10 @@ function PutoutModal({ outCode, battingOrder, playerPositions, onConfirm, onSkip
   }))
 
   const label = outCode === 'G' ? 'Groundout' : outCode === 'FC' ? "Fielder's Choice" : 'Flyout'
+  // DP only makes sense for ground balls / FC, and only when there's a runner who could be the 2nd out
+  const canDP = (outCode === 'G' || outCode === 'FC') && bases.some(Boolean)
+  // When we're batting, hide the fielder selection (those would be opponent fielders we don't track)
+  const showFielders = !hideFielders
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end z-50">
@@ -916,32 +934,36 @@ function PutoutModal({ outCode, battingOrder, playerPositions, onConfirm, onSkip
           <h3 className="font-bold">Record {label}</h3>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          Tap the fielder who got the out. Tap a second player if there was an assist (they threw it to get the out). Skip if unsure.
+          {showFielders
+            ? 'Tap the fielder who got the out. Tap a second player if there was an assist (they threw it to get the out). Skip if unsure.'
+            : 'Toggle Double Play if the opposing team got a second out on this play.'}
         </p>
 
-        <div className="mb-3">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Who got the out?</span>
-            <span className="text-xs bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
+        {showFielders && (
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Who got the out?</span>
+              <span className="text-xs bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {players.map(({ name, pos }) => (
+                <button
+                  key={name}
+                  onClick={() => {
+                    setPutoutPlayer(name)
+                    if (assistPlayer === name) setAssistPlayer('')
+                  }}
+                  className={`btn btn-sm flex flex-col h-auto py-1.5 gap-0 ${putoutPlayer === name ? 'btn-primary' : 'btn-ghost'}`}
+                >
+                  <span className="text-xs font-black leading-tight">{pos}</span>
+                  <span className="text-xs leading-tight">{name.split(' ')[0]}</span>
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-4 gap-1">
-            {players.map(({ name, pos }) => (
-              <button
-                key={name}
-                onClick={() => {
-                  setPutoutPlayer(name)
-                  if (assistPlayer === name) setAssistPlayer('')
-                }}
-                className={`btn btn-sm flex flex-col h-auto py-1.5 gap-0 ${putoutPlayer === name ? 'btn-primary' : 'btn-ghost'}`}
-              >
-                <span className="text-xs font-black leading-tight">{pos}</span>
-                <span className="text-xs leading-tight">{name.split(' ')[0]}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
 
-        {putoutPlayer && (
+        {showFielders && putoutPlayer && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Who threw/relayed? (optional)</span>
@@ -962,14 +984,30 @@ function PutoutModal({ outCode, battingOrder, playerPositions, onConfirm, onSkip
           </div>
         )}
 
+        {/* Double-play toggle — only for FC/G with a runner on base */}
+        {canDP && (
+          <div className="mt-3 mb-3 p-2 border-2 border-dashed border-red-300 bg-red-50 rounded-lg">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={doublePlay}
+                onChange={e => setDoublePlay(e.target.checked)}
+                className="w-4 h-4 accent-red-600"
+              />
+              <span className="text-sm font-bold text-red-700">⚡ Double Play</span>
+              <span className="text-xs text-red-600/80">— records a second out (the batter + lead runner)</span>
+            </label>
+          </div>
+        )}
+
         <div className="flex gap-2 mt-2">
           <button onClick={onSkip} className="btn btn-ghost btn-md flex-1">Skip</button>
           <button
-            onClick={() => onConfirm(putoutPlayer, assistPlayer)}
-            disabled={!putoutPlayer}
+            onClick={() => onConfirm(putoutPlayer, assistPlayer, doublePlay)}
+            disabled={showFielders && !putoutPlayer}
             className="btn btn-success btn-md flex-1"
           >
-            ✓ Log Play
+            ✓ Log {doublePlay ? 'Double ' : ''}Play
           </button>
         </div>
       </div>
