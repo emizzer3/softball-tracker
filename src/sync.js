@@ -1,5 +1,6 @@
 // src/sync.js
 import { createClient } from '@supabase/supabase-js'
+import { getTeamConfig } from './storage'
 
 // Lazily-initialised Supabase client.
 // _setClientForTesting(mockClient) — inject a mock; _setClientForTesting(null) — simulate "not configured".
@@ -42,4 +43,68 @@ export const SYNC_KEYS = {
   sft_teams:        'teams',
   sft_tournaments:  'tournaments',
   sft_schedule:     'schedule',
+}
+
+// ── Push a single key to Supabase ─────────────────────────────
+// Reads teamId from sft_team; no-ops if local-only or Supabase unavailable.
+export async function pushKey(localKey) {
+  const teamId = getTeamConfig()?.teamId
+  if (!teamId || teamId === 'local') return
+  const remoteKey = SYNC_KEYS[localKey]
+  if (!remoteKey) return
+  const raw = localStorage.getItem(localKey)
+  if (raw === null) return
+  const client = getSupabase()
+  if (!client) return
+  const { error } = await client
+    .from('team_data')
+    .upsert(
+      { team_id: teamId, key: remoteKey, value: JSON.parse(raw) },
+      { onConflict: 'team_id,key' }
+    )
+  if (error) console.warn(`Sync push failed for ${localKey}:`, error.message)
+}
+
+// Push all synced keys at once (used after team creation / initial push).
+export async function pushAllLocalData(teamId) {
+  if (!teamId || teamId === 'local') return
+  for (const localKey of Object.keys(SYNC_KEYS)) {
+    const raw = localStorage.getItem(localKey)
+    if (raw === null) continue
+    const client = getSupabase()
+    if (!client) return
+    const { error } = await client
+      .from('team_data')
+      .upsert(
+        { team_id: teamId, key: SYNC_KEYS[localKey], value: JSON.parse(raw) },
+        { onConflict: 'team_id,key' }
+      )
+    if (error) console.warn(`pushAllLocalData failed for ${localKey}:`, error.message)
+  }
+}
+
+// ── Create a new team in Supabase ─────────────────────────────
+export async function createTeam({ name, division, pin }) {
+  const client = getSupabase()
+  if (!client) throw new Error('Cloud sync not configured')
+  const pin_hash = await hashPin(pin)
+  let retries = 0
+  while (retries < 5) {
+    const shortId = generateShortId(name)
+    const { data, error } = await client
+      .from('teams')
+      .insert({ name, division, pin_hash, short_id: shortId })
+      .select('id, short_id')
+      .single()
+    if (!error) return { teamId: data.id, shortId: data.short_id }
+    if (error.code === '23505') {
+      if (error.message.includes('name') && error.message.includes('division')) {
+        throw new Error('A team with this name and division already exists.')
+      }
+      retries++ // short_id collision — retry with new random number
+    } else {
+      throw new Error(error.message)
+    }
+  }
+  throw new Error('Could not generate a unique Team ID — please try again.')
 }

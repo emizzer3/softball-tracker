@@ -70,3 +70,82 @@ describe('generateShortId', () => {
     expect(id.startsWith('TEA-')).toBe(true)
   })
 })
+
+// Re-import the functions added in this task
+// (dynamic import at top of file already covers the whole module)
+const { pushKey, pushAllLocalData, createTeam } = await import('../sync.js')
+
+describe('pushKey', () => {
+  it('does nothing when teamId is "local"', async () => {
+    localStorage.setItem('sft_team', JSON.stringify({ teamId: 'local' }))
+    await pushKey('sft_roster')
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when key is not in SYNC_KEYS', async () => {
+    localStorage.setItem('sft_team', JSON.stringify({ teamId: 'uuid-123' }))
+    await pushKey('sft_setup_drafts')
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('calls upsert with correct team_id and key', async () => {
+    localStorage.setItem('sft_team', JSON.stringify({ teamId: 'uuid-abc' }))
+    localStorage.setItem('sft_roster', JSON.stringify([{ id: '1', name: 'Alice' }]))
+    mockFrom.mockReturnValue({ upsert: mockUpsert })
+    mockUpsert.mockResolvedValue({ error: null })
+
+    await pushKey('sft_roster')
+
+    expect(mockFrom).toHaveBeenCalledWith('team_data')
+    expect(mockUpsert).toHaveBeenCalledWith(
+      { team_id: 'uuid-abc', key: 'roster', value: [{ id: '1', name: 'Alice' }] },
+      { onConflict: 'team_id,key' }
+    )
+  })
+
+  it('does nothing when localStorage key has no value', async () => {
+    localStorage.setItem('sft_team', JSON.stringify({ teamId: 'uuid-abc' }))
+    localStorage.removeItem('sft_roster')
+    await pushKey('sft_roster')
+    expect(mockUpsert).not.toHaveBeenCalled()
+  })
+})
+
+describe('createTeam', () => {
+  it('throws when Supabase is not configured', async () => {
+    _setClientForTesting(null)
+    await expect(createTeam({ name: 'Test', division: 'Div 1', pin: '1234' }))
+      .rejects.toThrow('Cloud sync not configured')
+    _setClientForTesting(mockClient)
+  })
+
+  it('throws on duplicate team name+division', async () => {
+    const mockInsertChain = {
+      select: vi.fn(() => ({
+        single: vi.fn().mockResolvedValue({
+          data: null,
+          error: { code: '23505', message: 'duplicate key value violates unique constraint "teams_name_division_key"' },
+        }),
+      })),
+    }
+    mockFrom.mockReturnValue({ insert: vi.fn(() => mockInsertChain) })
+
+    await expect(createTeam({ name: 'Duplicate', division: 'Div 1', pin: '1234' }))
+      .rejects.toThrow('A team with this name and division already exists.')
+  })
+
+  it('returns teamId and shortId on success', async () => {
+    const mockInsertChain = {
+      select: vi.fn(() => ({
+        single: vi.fn().mockResolvedValue({
+          data: { id: 'team-uuid-1', short_id: 'TES-1234' },
+          error: null,
+        }),
+      })),
+    }
+    mockFrom.mockReturnValue({ insert: vi.fn(() => mockInsertChain) })
+
+    const result = await createTeam({ name: 'Test FC', division: 'Div 2', pin: '5678' })
+    expect(result).toEqual({ teamId: 'team-uuid-1', shortId: 'TES-1234' })
+  })
+})
