@@ -2,15 +2,16 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Lazily-initialised Supabase client.
-// _setClientForTesting() allows tests to inject a mock without env vars.
-let _client = null
+// _setClientForTesting(mockClient) — inject a mock; _setClientForTesting(null) — simulate "not configured".
+// undefined = not yet initialised; null = explicitly disabled (no Supabase).
+let _client = undefined
 export function _setClientForTesting(client) { _client = client }
 
 function getSupabase() {
-  if (_client) return _client
+  if (_client !== undefined) return _client   // covers injected mock AND explicit null (disabled)
   const url = import.meta.env.VITE_SUPABASE_URL
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-  if (!url || !key) return null
+  if (!url || !key) { _client = null; return null }
   _client = createClient(url, key)
   return _client
 }

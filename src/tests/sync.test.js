@@ -24,6 +24,8 @@ vi.mock('@supabase/supabase-js', () => ({
 const { hashPin, generateShortId, _setClientForTesting } = await import('../sync.js')
 
 beforeEach(() => {
+  // Reset to mock client between tests so no test leaks state.
+  // Tests that need "Supabase not configured" call _setClientForTesting(null) themselves.
   _setClientForTesting(mockClient)
   vi.clearAllMocks()
 })
