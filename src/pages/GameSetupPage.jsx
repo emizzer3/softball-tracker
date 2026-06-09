@@ -3,7 +3,7 @@ import { CheckCircle, Circle, AlertCircle, ChevronLeft, GripVertical, X } from '
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft } from '../storage'
+import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft, getTeamConfig } from '../storage'
 
 // Defined OUTSIDE GameSetupPage so React doesn't treat it as a new component
 // type on every render (which causes unmount/remount and scroll-to-top on iOS).
@@ -46,7 +46,7 @@ export default function GameSetupPage({ draftKey = 'default', onStart, onBack })
   // Load draft for this specific fixture/slot on first render
   const draft = useMemo(() => getSetupDraft(draftKey), [draftKey])
 
-  const OUR_TEAM = 'The Renegades'
+  const OUR_TEAM = getTeamConfig()?.name ?? ''
 
   // Step 1
   const [date,           setDate]           = useState(() => draft?.date           ?? new Date().toISOString().split('T')[0])
