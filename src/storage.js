@@ -11,10 +11,7 @@ const K = {
   TEAM:        'sft_team',
 }
 
-const DEFAULT_TEAMS = [
-  'Buccs Whizz', 'Victorious Secret', 'Vandals',
-  'Grandslammers', 'Archway', 'BAM!', 'Monkeys',
-]
+const DEFAULT_TEAMS = []
 
 function get(key, fallback) {
   try {
@@ -28,25 +25,7 @@ function set(key, value) {
 }
 
 // ── Roster ────────────────────────────────────────────────────
-const DEFAULT_ROSTER = [
-  // BBH
-  { id: 'matt',      name: 'Matt',      type: 'BBH', active: true },
-  { id: 'jeremy',    name: 'Jeremy',    type: 'BBH', active: true },
-  { id: 'arthur',    name: 'Arthur',    type: 'BBH', active: true },
-  { id: 'lewis',     name: 'Lewis',     type: 'BBH', active: true },
-  { id: 'sam',       name: 'Sam',       type: 'BBH', active: true },
-  { id: 'karl',      name: 'Karl',      type: 'BBH', active: true },
-  { id: 'alex',      name: 'Alex',      type: 'BBH', active: true },
-  { id: 'omar',      name: 'Omar',      type: 'BBH', active: true },
-  // SBH
-  { id: 'caoimhe',   name: 'Caoimhe',   type: 'SBH', active: true },
-  { id: 'charlotte', name: 'Charlotte', type: 'SBH', active: true },
-  { id: 'emily',     name: 'Emily',     type: 'SBH', active: true },
-  { id: 'becky',     name: 'Becky',     type: 'SBH', active: true },
-  { id: 'woody',     name: 'Woody',     type: 'SBH', active: true },
-  { id: 'emma',      name: 'Emma',      type: 'SBH', active: true },
-  { id: 'zara',      name: 'Zara',      type: 'SBH', active: true },
-]
+const DEFAULT_ROSTER = []
 
 export function getRoster() { return get(K.ROSTER, DEFAULT_ROSTER) }
 export function saveRoster(roster) { set(K.ROSTER, roster) }
@@ -77,7 +56,7 @@ export function setPin(pin) { set(K.PIN, pin) }
 export function checkPin(pin) { return pin === getPin() }
 
 // ── League settings ───────────────────────────────────────────
-export function getDivision() { return get(K.DIVISION, 'Bristol Division 2') }
+export function getDivision() { return get(K.DIVISION, '') }
 export function setDivision(name) { set(K.DIVISION, name) }
 
 export function getTeams() { return get(K.TEAMS, DEFAULT_TEAMS) }
@@ -103,23 +82,7 @@ export function rememberTournament(name) {
 }
 
 // ── Schedule (upcoming fixtures) ─────────────────────────────
-// Only Renegades fixtures from the Bristol Division 2 2026 schedule
-const DEFAULT_SCHEDULE = [
-  { id: 's1',  date: '2026-04-30', opponent: 'Grandslammers',     gameType: 'League', location: 'Away', pitch: 2 },
-  { id: 's2',  date: '2026-05-07', opponent: 'Buccs Whizz',       gameType: 'League', location: 'Away', pitch: 3 },
-  { id: 's3',  date: '2026-05-14', opponent: 'Monkeys',           gameType: 'League', location: 'Home', pitch: 1 },
-  { id: 's4',  date: '2026-05-21', opponent: 'Archway',           gameType: 'League', location: 'Home', pitch: 2 },
-  { id: 's5',  date: '2026-05-28', opponent: 'Vandals',           gameType: 'League', location: 'Away', pitch: 4 },
-  { id: 's6',  date: '2026-06-04', opponent: 'BAM!',              gameType: 'League', location: 'Away', pitch: 1 },
-  { id: 's7',  date: '2026-06-11', opponent: 'Victorious Secret', gameType: 'League', location: 'Home', pitch: 3 },
-  { id: 's8',  date: '2026-06-18', opponent: 'Grandslammers',     gameType: 'League', location: 'Home', pitch: 1 },
-  { id: 's9',  date: '2026-06-25', opponent: 'Buccs Whizz',       gameType: 'League', location: 'Home', pitch: 4 },
-  { id: 's10', date: '2026-07-02', opponent: 'Monkeys',           gameType: 'League', location: 'Away', pitch: 2 },
-  { id: 's11', date: '2026-07-16', opponent: 'Archway',           gameType: 'League', location: 'Away', pitch: 1 },
-  { id: 's12', date: '2026-07-23', opponent: 'Vandals',           gameType: 'League', location: 'Home', pitch: 3 },
-  { id: 's13', date: '2026-07-30', opponent: 'BAM!',              gameType: 'League', location: 'Home', pitch: 2 },
-  { id: 's14', date: '2026-08-13', opponent: 'Victorious Secret', gameType: 'League', location: 'Away', pitch: 4 },
-]
+const DEFAULT_SCHEDULE = []
 
 export function getSchedule() { return get(K.SCHEDULE, DEFAULT_SCHEDULE) }
 export function saveSchedule(schedule) { set(K.SCHEDULE, schedule) }
