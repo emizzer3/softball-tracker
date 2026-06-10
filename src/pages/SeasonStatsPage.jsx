@@ -4,6 +4,7 @@ import { getGames, computeSeasonStats, deleteGame, getSeasonRecord } from '../st
 
 const STAT_TIPS = {
   G:    { label: 'Games',           desc: 'Number of games this player batted in.' },
+  R:    { label: 'Runs',             desc: 'Times this player crossed home plate and scored a run.' },
   AB:   { label: 'At Bats',         desc: 'Plate appearances that count as official at-bats. Walks, hit-by-pitch, and sacrifices are excluded.' },
   H:    { label: 'Hits',            desc: 'Total hits — singles + doubles + triples + home runs.' },
   '2B': { label: 'Doubles',         desc: 'Times the batter reached 2nd base on a hit.' },
@@ -32,7 +33,7 @@ function StatGuideSheet({ onClose }) {
           <div>
             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1.5">Batting</p>
             <div className="space-y-2">
-              {['G','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG'].map(k => (
+              {['G','R','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG'].map(k => (
                 <div key={k} className="flex gap-3 items-start">
                   <span className="shrink-0 w-10 text-center font-black text-xs bg-gray-100 text-gray-700 px-1 py-0.5 rounded">{k}</span>
                   <div>
@@ -68,7 +69,20 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
   const [games, setGames] = useState(getGames)
   const [activeTab, setActiveTab] = useState('batting')
   const [showGuide, setShowGuide] = useState(false)
-  const stats = computeSeasonStats()
+  const [sortCol, setSortCol] = useState('AB')
+  const [sortAsc, setSortAsc] = useState(false)
+
+  function handleSort(col) {
+    if (sortCol === col) setSortAsc(a => !a)
+    else { setSortCol(col); setSortAsc(false) }
+  }
+
+  const rawStats = computeSeasonStats()
+  const stats = [...rawStats].sort((a, b) => {
+    const av = a[sortCol], bv = b[sortCol]
+    if (typeof av === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av)
+    return sortAsc ? av - bv : bv - av
+  })
   const record = getSeasonRecord()
 
   function handleDelete(id) {
@@ -135,12 +149,18 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    {['Player','G','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG'].map(h => (
-                      <th key={h} className={`py-1 font-semibold whitespace-nowrap ${
-                        h === 'Player' ? 'text-left px-1 text-gray-500' :
-                        ['AVG','OBP','SLG'].includes(h) ? 'text-center px-0.5 text-indigo-500' :
-                        'text-center px-0.5 text-gray-500'
-                      }`}>{h}</th>
+                    {['Player','G','R','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG'].map(h => (
+                      <th
+                        key={h}
+                        onClick={h !== 'Player' ? () => handleSort(h) : undefined}
+                        className={`py-1 font-semibold whitespace-nowrap select-none ${
+                          h === 'Player' ? 'text-left px-1 text-gray-500' :
+                          ['AVG','OBP','SLG'].includes(h) ? 'text-center px-0.5 text-indigo-500 cursor-pointer hover:text-indigo-700' :
+                          'text-center px-0.5 text-gray-500 cursor-pointer hover:text-gray-700'
+                        }`}
+                      >
+                        {h}{sortCol === h ? (sortAsc ? ' ▲' : ' ▼') : ''}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -148,7 +168,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                   {stats.map(p => (
                     <tr key={p.name} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-1.5 px-1 font-medium whitespace-nowrap">{p.name}</td>
-                      {[p.G, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
+                      {[p.G, p.R || 0, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
                         <td key={i} className="py-1.5 px-0.5 text-center">{v}</td>
                       ))}
                       <td className="py-1.5 px-0.5 text-center text-indigo-600 font-medium">{p.AVG}</td>
