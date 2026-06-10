@@ -83,6 +83,41 @@ export async function pushAllLocalData(teamId) {
   }
 }
 
+// ── Pull all team data from Supabase into localStorage ────────
+export async function pullAllData(teamId) {
+  if (!teamId || teamId === 'local') return
+  const client = getSupabase()
+  if (!client) return
+  const { data, error } = await client
+    .from('team_data')
+    .select('key, value')
+    .eq('team_id', teamId)
+  if (error) throw error
+  const reverseKeys = Object.fromEntries(
+    Object.entries(SYNC_KEYS).map(([localKey, remoteKey]) => [remoteKey, localKey])
+  )
+  for (const row of (data || [])) {
+    const localKey = reverseKeys[row.key]
+    if (localKey) localStorage.setItem(localKey, JSON.stringify(row.value))
+  }
+}
+
+// ── Load an existing team by Short ID + PIN ────────────────────
+export async function loadTeamByShortId(shortId, pin) {
+  const client = getSupabase()
+  if (!client) throw new Error('Cloud sync not configured')
+  const { data: team, error } = await client
+    .from('teams')
+    .select('id, name, division, pin_hash, short_id')
+    .eq('short_id', shortId.trim().toUpperCase())
+    .single()
+  if (error || !team) throw new Error('Team not found — check your Team ID.')
+  const inputHash = await hashPin(pin)
+  if (inputHash !== team.pin_hash) throw new Error('Wrong PIN.')
+  await pullAllData(team.id)
+  return { teamId: team.id, shortId: team.short_id, name: team.name, division: team.division }
+}
+
 // ── Create a new team in Supabase ─────────────────────────────
 export async function createTeam({ name, division, pin }) {
   const client = getSupabase()
