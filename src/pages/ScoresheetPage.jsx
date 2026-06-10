@@ -1,4 +1,4 @@
-import { Printer, Home } from 'lucide-react'
+import { Printer, Home, Share2 } from 'lucide-react'
 import { useState } from 'react'
 
 const POSITIONS = ['P','C','1B','2B','3B','SS','LF','LC','RC','RF','EF']
@@ -127,8 +127,46 @@ function EmptyCell() {
   )
 }
 
+function formatShareText(game) {
+  const { home, away, homeScore, awayScore, date, gameType, battingOrder = [], atBats = [] } = game
+  const lines = [
+    `${away} @ ${home}`,
+    `${date} · ${gameType}`,
+    `Final: ${homeScore ?? 0}–${awayScore ?? 0}`,
+    '',
+    'Batting:',
+  ]
+  for (const batter of battingOrder) {
+    const abs = atBats.filter(ab => ab.batter === batter)
+    const AB  = abs.filter(ab => !['BB','HBP','SAC'].includes(ab.outcome)).length
+    const H   = abs.filter(ab => ['1B','2B','3B','HR'].includes(ab.outcome)).length
+    const HR  = abs.filter(ab => ab.outcome === 'HR').length
+    const RBI = abs.reduce((s, ab) => s + (ab.rbi || 0), 0)
+    const AVG = AB > 0 ? (H / AB).toFixed(3).replace(/^0/, '') : '.000'
+    const extras = []
+    if (HR > 0)  extras.push(`${HR} HR`)
+    if (RBI > 0) extras.push(`${RBI} RBI`)
+    lines.push(`  ${batter}: ${H}/${AB}${extras.length ? ` (${extras.join(', ')})` : ''} · ${AVG}`)
+  }
+  return lines.join('\n')
+}
+
 export default function ScoresheetPage({ game, onHome, onSummary }) {
   const { atBats = [], battingOrder = [], innings, home, away, homeScore, awayScore, inningScores = [], date, gameType, tournamentName } = game
+
+  const [copied, setCopied] = useState(false)
+
+  async function handleShare() {
+    const title = `${away} @ ${home} — ${date}`
+    const text  = formatShareText(game)
+    if (navigator.share) {
+      try { await navigator.share({ title, text }) } catch { /* user cancelled */ }
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(`${title}\n\n${text}`).catch(() => {})
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   // Build grid: batters × innings
   // Each cell: the at-bat record for that batter in that inning (or null)
@@ -166,6 +204,9 @@ export default function ScoresheetPage({ game, onHome, onSummary }) {
         {onSummary && (
           <button onClick={onSummary} className="btn btn-ghost btn-sm gap-1">📋 Summary</button>
         )}
+        <button onClick={handleShare} className="btn btn-ghost btn-sm gap-1 relative">
+          <Share2 size={14} /> {copied ? <span className="text-green-600 font-semibold">Copied!</span> : 'Share'}
+        </button>
         <button onClick={() => window.print()} className="btn btn-primary btn-sm gap-1">
           <Printer size={14} /> Print
         </button>
