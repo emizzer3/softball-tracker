@@ -4,13 +4,16 @@ import { createTeam, pushAllLocalData, loadTeamByShortId } from '../sync'
 
 export default function CloudConnectPage({ onComplete }) {
   const config = getTeamConfig()
+  if (!config) return null  // shouldn't happen — onboarding ensures sft_team exists
+
   const [mode, setMode] = useState(null) // null | 'create'
   const [pin, setPin] = useState('')
   const [shortId, setShortId] = useState('')
   const [loadPin, setLoadPin] = useState('')
   const [createError, setCreateError] = useState('')
   const [loadError, setLoadError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loadingCreate, setLoadingCreate] = useState(false)
+  const [loadingLoad, setLoadingLoad] = useState(false)
 
   function handleSkip() {
     setTeamConfig({ ...config, teamId: 'local' })
@@ -24,7 +27,7 @@ export default function CloudConnectPage({ onComplete }) {
       setCreateError('PIN must be at least 4 digits')
       return
     }
-    setLoading(true)
+    setLoadingCreate(true)
     try {
       const { teamId, shortId: newShortId } = await createTeam({
         name: config.name,
@@ -37,7 +40,7 @@ export default function CloudConnectPage({ onComplete }) {
     } catch (err) {
       setCreateError(err.message)
     } finally {
-      setLoading(false)
+      setLoadingCreate(false)
     }
   }
 
@@ -46,15 +49,15 @@ export default function CloudConnectPage({ onComplete }) {
     setLoadError('')
     if (!shortId.trim()) { setLoadError('Enter your Team ID'); return }
     if (!loadPin) { setLoadError('Enter your PIN'); return }
-    setLoading(true)
+    setLoadingLoad(true)
     try {
-      const result = await loadTeamByShortId(shortId, loadPin)
+      const result = await loadTeamByShortId(shortId.trim().toUpperCase(), loadPin)
       setTeamConfig({ ...config, teamId: result.teamId, shortId: result.shortId })
       onComplete()
     } catch (err) {
       setLoadError(err.message)
     } finally {
-      setLoading(false)
+      setLoadingLoad(false)
     }
   }
 
@@ -92,10 +95,10 @@ export default function CloudConnectPage({ onComplete }) {
             {createError && <p className="text-red-600 text-sm">{createError}</p>}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loadingCreate}
               className="btn btn-primary btn-md w-full"
             >
-              {loading ? 'Creating…' : 'Set up cloud sync →'}
+              {loadingCreate ? 'Creating…' : 'Set up cloud sync →'}
             </button>
             <button
               type="button"
@@ -147,10 +150,10 @@ export default function CloudConnectPage({ onComplete }) {
                 {loadError && <p className="text-red-600 text-sm">{loadError}</p>}
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loadingLoad}
                   className="btn btn-ghost btn-md w-full border border-gray-200"
                 >
-                  {loading ? 'Loading…' : 'Load team →'}
+                  {loadingLoad ? 'Loading…' : 'Load team →'}
                 </button>
               </form>
             </div>
