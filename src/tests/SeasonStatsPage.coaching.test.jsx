@@ -74,13 +74,13 @@ describe('runs per game chart', () => {
       ],
     })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    expect(screen.getByText('Runs Per Game')).toBeInTheDocument()
+    expect(screen.getByText('Team Trends')).toBeInTheDocument()
   })
 
   it('hides chart when fewer than 2 games', () => {
     setupMocks({ runs: [] })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    expect(screen.queryByText('Runs Per Game')).not.toBeInTheDocument()
+    expect(screen.queryByText('Team Trends')).not.toBeInTheDocument()
   })
 })
 

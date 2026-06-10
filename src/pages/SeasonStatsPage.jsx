@@ -344,32 +344,103 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
         </div>
       )}
 
-      {/* Runs per game chart */}
+      {/* Team trends charts */}
       {(() => {
         const runs = computeRunsPerGame()
+        const allGames = games.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+        const battingByGame = allGames
+          .filter(g => g.atBats?.length > 0)
+          .map(g => {
+            const abs = g.atBats || []
+            const singles = abs.filter(ab => ab.outcome === '1B').length
+            const doubles = abs.filter(ab => ab.outcome === '2B').length
+            const triples = abs.filter(ab => ab.outcome === '3B').length
+            const hrs     = abs.filter(ab => ab.outcome === 'HR').length
+            return { gameId: g.id, date: g.date, singles, doubles, triples, hrs, total: singles + doubles + triples + hrs, result: g.result }
+          })
+
         if (runs.length < 2) return null
+
         const maxRuns = Math.max(...runs.map(g => Math.max(g.ourRuns, g.theirRuns)), 1)
+        const maxHits = Math.max(...battingByGame.map(g => g.total), 1)
+        const BAR_H = 80 // px, the drawable bar area
+
         return (
-          <div className="card mb-4 p-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Runs Per Game</p>
-            <div className="flex items-end gap-1 h-20 overflow-x-auto pb-1">
-              {runs.map(g => {
-                const heightPct = Math.round((g.ourRuns / maxRuns) * 100)
-                const color = g.result === 'W' ? 'bg-green-500' : g.result === 'L' ? 'bg-red-400' : 'bg-gray-400'
-                return (
-                  <div key={g.gameId} className="flex flex-col items-center gap-0.5 shrink-0" style={{ minWidth: 24 }}>
-                    <span className="text-xs font-bold text-gray-700 leading-none">{g.ourRuns}</span>
-                    <div className={`w-5 rounded-sm ${color}`} style={{ height: `${Math.max(heightPct, 8)}%` }} title={`${g.opponent} · ${g.ourRuns}–${g.theirRuns}`} />
-                    <span className="text-[9px] text-gray-400 leading-none truncate w-5 text-center">{g.date.slice(5)}</span>
+          <div className="card mb-4 p-3 space-y-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Team Trends</p>
+
+            {/* Runs per game */}
+            <div>
+              <p className="text-xs text-gray-400 mb-2">Runs scored vs allowed</p>
+              <div className="overflow-x-auto">
+                <div className="flex items-end gap-2 pb-1" style={{ height: BAR_H + 40 }}>
+                  {runs.map(g => {
+                    const ourH    = Math.max(Math.round((g.ourRuns   / maxRuns) * BAR_H), 4)
+                    const theirH  = Math.max(Math.round((g.theirRuns / maxRuns) * BAR_H), 4)
+                    const barColor = g.result === 'W' ? '#22c55e' : g.result === 'L' ? '#f87171' : '#9ca3af'
+                    return (
+                      <div key={g.gameId} className="flex flex-col items-center shrink-0" style={{ width: 36 }}>
+                        {/* Score label */}
+                        <span className="text-[10px] font-bold text-gray-600 leading-none mb-1">
+                          {g.ourRuns}–{g.theirRuns}
+                        </span>
+                        {/* Bars */}
+                        <div className="flex items-end gap-0.5" style={{ height: BAR_H }}>
+                          <div className="w-3.5 rounded-t-sm transition-all" style={{ height: ourH, backgroundColor: barColor }} title={`Us: ${g.ourRuns}`} />
+                          <div className="w-3.5 rounded-t-sm bg-gray-200" style={{ height: theirH }} title={`${g.opponent}: ${g.theirRuns}`} />
+                        </div>
+                        {/* Date */}
+                        <span className="text-[10px] text-gray-400 leading-tight mt-1 text-center w-full truncate">{g.date.slice(5)}</span>
+                        {/* Opponent */}
+                        <span className="text-[9px] text-gray-300 leading-none text-center w-full truncate">{g.opponent}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-4 mt-1 text-[10px] text-gray-400">
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-green-500" />Us (W)</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-red-400" />Us (L)</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-gray-200" />Them</span>
+              </div>
+            </div>
+
+            {/* Batting spread — hit type breakdown per game */}
+            {battingByGame.length >= 2 && (
+              <div>
+                <p className="text-xs text-gray-400 mb-2">Hits by type per game</p>
+                <div className="overflow-x-auto">
+                  <div className="flex items-end gap-2 pb-1" style={{ height: BAR_H + 40 }}>
+                    {battingByGame.map(g => {
+                      const totalH  = Math.max(Math.round((g.total   / maxHits) * BAR_H), 4)
+                      const hrsH    = g.total > 0 ? Math.round((g.hrs     / g.total) * totalH) : 0
+                      const triH    = g.total > 0 ? Math.round((g.triples / g.total) * totalH) : 0
+                      const dblH    = g.total > 0 ? Math.round((g.doubles / g.total) * totalH) : 0
+                      const sngH    = Math.max(totalH - hrsH - triH - dblH, 0)
+                      return (
+                        <div key={g.gameId} className="flex flex-col items-center shrink-0" style={{ width: 36 }}>
+                          <span className="text-[10px] font-bold text-gray-600 leading-none mb-1">{g.total}</span>
+                          <div className="flex flex-col-reverse w-7 rounded-t-sm overflow-hidden" style={{ height: Math.max(totalH, 4) }}>
+                            {sngH > 0 && <div style={{ height: sngH, backgroundColor: '#bae6fd' }} title={`1B: ${g.singles}`} />}
+                            {dblH > 0 && <div style={{ height: dblH, backgroundColor: '#3b82f6' }} title={`2B: ${g.doubles}`} />}
+                            {triH > 0 && <div style={{ height: triH, backgroundColor: '#7c3aed' }} title={`3B: ${g.triples}`} />}
+                            {hrsH > 0 && <div style={{ height: hrsH, backgroundColor: '#f59e0b' }} title={`HR: ${g.hrs}`} />}
+                          </div>
+                          <span className="text-[10px] text-gray-400 leading-tight mt-1 text-center w-full truncate">{g.date.slice(5)}</span>
+                          <span className={`text-[9px] font-bold leading-none ${g.result === 'W' ? 'text-green-500' : g.result === 'L' ? 'text-red-400' : 'text-gray-400'}`}>{g.result}</span>
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-              })}
-            </div>
-            <div className="flex gap-3 mt-1 text-[10px] text-gray-400">
-              <span><span className="inline-block w-2 h-2 rounded-sm bg-green-500 mr-0.5" />W</span>
-              <span><span className="inline-block w-2 h-2 rounded-sm bg-red-400 mr-0.5" />L</span>
-              <span><span className="inline-block w-2 h-2 rounded-sm bg-gray-400 mr-0.5" />D</span>
-            </div>
+                </div>
+                <div className="flex gap-4 mt-1 text-[10px] text-gray-400">
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#bae6fd' }} />1B</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#3b82f6' }} />2B</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#7c3aed' }} />3B</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />HR</span>
+                </div>
+              </div>
+            )}
           </div>
         )
       })()}
