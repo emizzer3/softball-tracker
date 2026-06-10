@@ -47,6 +47,32 @@ export const SYNC_KEYS = {
   sft_schedule:     'schedule',
 }
 
+// ── Offline sync queue ────────────────────────────────────────
+const QUEUE_KEY = 'sft_sync_queue'
+
+export function getQueue() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') } catch { return [] }
+}
+
+function enqueue(localKey) {
+  const q = new Set(getQueue())
+  q.add(localKey)
+  localStorage.setItem(QUEUE_KEY, JSON.stringify([...q]))
+}
+
+function dequeue(localKey) {
+  const q = getQueue().filter(k => k !== localKey)
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(q))
+}
+
+export async function flushQueue() {
+  const q = getQueue()
+  if (q.length === 0) return
+  for (const localKey of q) {
+    await pushKey(localKey).catch(() => {})
+  }
+}
+
 // ── Push a single key to Supabase ─────────────────────────────
 // Reads teamId from sft_team; no-ops if local-only or Supabase unavailable.
 export async function pushKey(localKey) {
@@ -64,7 +90,12 @@ export async function pushKey(localKey) {
       { team_id: teamId, key: remoteKey, value: JSON.parse(raw) },
       { onConflict: 'team_id,key' }
     )
-  if (error) console.warn(`Sync push failed for ${localKey}:`, error.message)
+  if (error) {
+    if (!navigator.onLine) enqueue(localKey)
+    console.warn(`Sync push failed for ${localKey}:`, error.message)
+    return
+  }
+  dequeue(localKey)
 }
 
 // Push all synced keys at once (used after team creation / initial push).
