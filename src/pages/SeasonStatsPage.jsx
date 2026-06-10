@@ -190,19 +190,6 @@ function SprayDiamond({ dots, label, highlightBatter, onDotTap, selectedIdx }) {
   )
 }
 
-function getStreak(p) {
-  const log = computePlayerGameLog(p.name)
-  if (log.length < 3) return null
-  const last3 = log.slice(-3)
-  const last3AB = last3.reduce((s, g) => s + g.AB, 0)
-  const last3H  = last3.reduce((s, g) => s + g.H,  0)
-  const last3Avg = last3AB > 0 ? last3H / last3AB : 0
-  const seasonAvg = p.AB > 0 ? p.H / p.AB : 0
-  if (last3Avg >= seasonAvg + 0.080) return '🔥'
-  if (last3Avg <= seasonAvg - 0.080) return '🥶'
-  return null
-}
-
 export default function SeasonStatsPage({ onHome, onViewGame }) {
   const [games, setGames] = useState(getGames)
   const [activeTab, setActiveTab] = useState('batting')
@@ -274,16 +261,16 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 ⚾ Batting
               </button>
               <button
-                onClick={() => setActiveTab('fielding')}
-                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'fielding' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                🧤 Fielding
-              </button>
-              <button
                 onClick={() => setActiveTab('trends')}
                 className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'trends' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 📈 Trends
+              </button>
+              <button
+                onClick={() => setActiveTab('insights')}
+                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'insights' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                💡 Insights
               </button>
             </div>
             <button onClick={() => setShowGuide(true)} className="btn btn-ghost btn-sm text-xs gap-1 text-blue-500 py-0.5">
@@ -320,7 +307,6 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                         onClick={() => setSelectedPlayer(p.name)}
                       >
                         {p.name}
-                        {getStreak(p) && <span className="ml-1 text-base leading-none">{getStreak(p)}</span>}
                       </td>
                       {[p.G, p.R || 0, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
                         <td key={i} className="py-1.5 px-0.5 text-center">{v}</td>
@@ -371,37 +357,6 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                   </div>
                 )
               })()}
-            </div>
-          )}
-
-          {/* Fielding tab */}
-          {activeTab === 'fielding' && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    {['Player','G','PO','A','E'].map(h => (
-                      <th key={h} className={`py-1 font-semibold ${
-                        h === 'Player' ? 'text-left px-1 text-gray-500' :
-                        h === 'E' ? 'text-center px-2 text-red-400' :
-                        'text-center px-2 text-blue-400'
-                      }`}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.map(p => (
-                    <tr key={p.name} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-1.5 px-1 font-medium">{p.name}</td>
-                      <td className="py-1.5 px-2 text-center">{p.G}</td>
-                      <td className="py-1.5 px-2 text-center text-blue-600 font-medium">{p.PO || 0}</td>
-                      <td className="py-1.5 px-2 text-center text-blue-500">{p.A  || 0}</td>
-                      <td className="py-1.5 px-2 text-center text-red-500">{p.E  || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-xs text-gray-400 mt-2">PO = putouts · A = assists · E = errors</p>
             </div>
           )}
 
@@ -588,6 +543,248 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
               </div>
             )
           })()}
+
+          {/* Insights tab */}
+          {activeTab === 'insights' && (() => {
+            const OUT_TYPES = ['K', 'F', 'G', 'FC', 'SAC']
+            const OUT_LABELS = { K: 'Strikeout', F: 'Flyout', G: 'Groundout', FC: "Fielder's Choice", SAC: 'Sacrifice' }
+            const OUT_COLORS = { K: '#ef4444', F: '#f97316', G: '#eab308', FC: '#a855f7', SAC: '#6b7280' }
+
+            // Build per-player insights from game log
+            const insights = rawStats.filter(p => p.G >= 1).map(p => {
+              const log = computePlayerGameLog(p.name)
+              const seasonAvg = p.AB > 0 ? p.H / p.AB : 0
+
+              // Streak: last 3 games vs season
+              const last3 = log.slice(-3)
+              const last3AB = last3.reduce((s, g) => s + g.AB, 0)
+              const last3H  = last3.reduce((s, g) => s + g.H,  0)
+              const last3Avg = last3AB > 0 ? last3H / last3AB : 0
+              const delta = last3Avg - seasonAvg
+              const streak = log.length >= 3
+                ? (delta >= 0.080 ? 'hot' : delta <= -0.080 ? 'cold' : 'steady')
+                : null
+
+              // Trend: per-game rolling AVG for sparkline
+              let cumAB = 0, cumH = 0
+              const avgByGame = log.map(g => {
+                cumAB += g.AB; cumH += g.H
+                return cumAB > 0 ? cumH / cumAB : 0
+              })
+
+              // Improvement: compare first half vs second half of games
+              const mid = Math.floor(log.length / 2)
+              const firstHalf = log.slice(0, mid)
+              const secondHalf = log.slice(mid)
+              const firstAB = firstHalf.reduce((s, g) => s + g.AB, 0)
+              const firstH  = firstHalf.reduce((s, g) => s + g.H,  0)
+              const secondAB = secondHalf.reduce((s, g) => s + g.AB, 0)
+              const secondH  = secondHalf.reduce((s, g) => s + g.H,  0)
+              const firstAvg = firstAB > 0 ? firstH / firstAB : 0
+              const secondAvg = secondAB > 0 ? secondH / secondAB : 0
+              const improving = log.length >= 4 ? secondAvg - firstAvg : null
+
+              // Outs breakdown
+              const allAbs = games.flatMap(g => (g.atBats || []).filter(ab => ab.batter === p.name))
+              const outs = {}
+              let totalOuts = 0
+              for (const t of OUT_TYPES) {
+                outs[t] = allAbs.filter(ab => ab.outcome === t).length
+                totalOuts += outs[t]
+              }
+
+              return { name: p.name, seasonAvg, last3Avg, delta, streak, avgByGame, improving, outs, totalOuts, G: log.length, AB: p.AB }
+            })
+
+            const hotPlayers = insights.filter(p => p.streak === 'hot').sort((a, b) => b.delta - a.delta)
+            const coldPlayers = insights.filter(p => p.streak === 'cold').sort((a, b) => a.delta - b.delta)
+            const improving = insights.filter(p => p.improving !== null && p.improving > 0.030).sort((a, b) => b.improving - a.improving)
+            const declining = insights.filter(p => p.improving !== null && p.improving < -0.030).sort((a, b) => a.improving - b.improving)
+            const playersWithOuts = insights.filter(p => p.totalOuts > 0).sort((a, b) => b.totalOuts - a.totalOuts)
+            const maxOuts = Math.max(...playersWithOuts.map(p => p.totalOuts), 1)
+
+            // Headlines
+            const mostKs = playersWithOuts.length > 0 ? [...playersWithOuts].sort((a, b) => b.outs.K - a.outs.K)[0] : null
+            const mostFCs = playersWithOuts.length > 0 ? [...playersWithOuts].sort((a, b) => b.outs.FC - a.outs.FC)[0] : null
+            const mostGrounders = playersWithOuts.length > 0 ? [...playersWithOuts].sort((a, b) => b.outs.G - a.outs.G)[0] : null
+
+            function fmtAvg(v) { return v.toFixed(3).replace(/^0/, '') }
+            function fmtDelta(v) { return (v >= 0 ? '+' : '') + v.toFixed(3).replace(/^0/, '').replace(/^-0/, '-') }
+
+            // Sparkline SVG
+            function Sparkline({ data, width = 80, height = 24 }) {
+              if (data.length < 2) return null
+              const max = Math.max(...data, 0.001)
+              const pts = data.map((v, i) => `${(i / (data.length - 1)) * width},${height - (v / max) * (height - 2)}`).join(' ')
+              const lastY = height - (data[data.length - 1] / max) * (height - 2)
+              const trending = data[data.length - 1] >= data[Math.max(0, data.length - 3)]
+              return (
+                <svg width={width} height={height} className="inline-block align-middle">
+                  <polyline points={pts} fill="none" stroke={trending ? '#22c55e' : '#ef4444'} strokeWidth={1.5} strokeLinejoin="round" />
+                  <circle cx={width} cy={lastY} r={2.5} fill={trending ? '#22c55e' : '#ef4444'} />
+                </svg>
+              )
+            }
+
+            return (
+              <div className="space-y-6">
+                {/* Hot & Cold streaks */}
+                {(hotPlayers.length > 0 || coldPlayers.length > 0) && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Streaks (Last 3 Games)</p>
+                    {hotPlayers.length > 0 && (
+                      <div className="space-y-2 mb-3">
+                        {hotPlayers.map(p => (
+                          <div key={p.name} className="flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-lg p-2">
+                            <span className="text-lg">🔥</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-gray-800">{p.name}</p>
+                              <p className="text-xs text-gray-500">
+                                Last 3: <span className="font-bold text-orange-600">{fmtAvg(p.last3Avg)}</span>
+                                {' vs season '}
+                                <span className="font-medium">{fmtAvg(p.seasonAvg)}</span>
+                                <span className="text-orange-600 font-bold ml-1">({fmtDelta(p.delta)})</span>
+                              </p>
+                            </div>
+                            <Sparkline data={p.avgByGame} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {coldPlayers.length > 0 && (
+                      <div className="space-y-2">
+                        {coldPlayers.map(p => (
+                          <div key={p.name} className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg p-2">
+                            <span className="text-lg">🥶</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-gray-800">{p.name}</p>
+                              <p className="text-xs text-gray-500">
+                                Last 3: <span className="font-bold text-blue-600">{fmtAvg(p.last3Avg)}</span>
+                                {' vs season '}
+                                <span className="font-medium">{fmtAvg(p.seasonAvg)}</span>
+                                <span className="text-blue-600 font-bold ml-1">({fmtDelta(p.delta)})</span>
+                              </p>
+                            </div>
+                            <Sparkline data={p.avgByGame} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {hotPlayers.length === 0 && coldPlayers.length === 0 && (
+                      <p className="text-gray-400 text-sm text-center py-3">No streaks — everyone is steady</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Improvement / Decline */}
+                {(improving.length > 0 || declining.length > 0) && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Season Trajectory</p>
+                    <p className="text-[10px] text-gray-400 mb-2">Comparing first half of games to second half</p>
+                    {improving.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-[10px] font-semibold text-green-600 uppercase mb-1">Improving</p>
+                        <div className="space-y-1.5">
+                          {improving.map(p => (
+                            <div key={p.name} className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-gray-700 w-20 truncate">{p.name}</span>
+                              <div className="flex-1 flex items-center gap-1.5">
+                                <div className="h-3 rounded-full bg-green-100 flex-1 relative overflow-hidden">
+                                  <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${Math.min(Math.abs(p.improving) / 0.15 * 100, 100)}%` }} />
+                                </div>
+                                <span className="text-[10px] font-bold text-green-600 w-10 text-right">{fmtDelta(p.improving)}</span>
+                              </div>
+                              <Sparkline data={p.avgByGame} width={60} height={18} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {declining.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-red-500 uppercase mb-1">Declining</p>
+                        <div className="space-y-1.5">
+                          {declining.map(p => (
+                            <div key={p.name} className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-gray-700 w-20 truncate">{p.name}</span>
+                              <div className="flex-1 flex items-center gap-1.5">
+                                <div className="h-3 rounded-full bg-red-100 flex-1 relative overflow-hidden">
+                                  <div className="h-full rounded-full bg-red-400 transition-all" style={{ width: `${Math.min(Math.abs(p.improving) / 0.15 * 100, 100)}%` }} />
+                                </div>
+                                <span className="text-[10px] font-bold text-red-500 w-10 text-right">{fmtDelta(p.improving)}</span>
+                              </div>
+                              <Sparkline data={p.avgByGame} width={60} height={18} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Outs Breakdown */}
+                {playersWithOuts.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">How Players Get Out</p>
+                    {/* Headlines */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {mostKs && mostKs.outs.K > 0 && (
+                        <span className="text-[10px] bg-red-50 text-red-600 font-semibold px-2 py-0.5 rounded-full">Most Ks: {mostKs.name} ({mostKs.outs.K})</span>
+                      )}
+                      {mostFCs && mostFCs.outs.FC > 0 && (
+                        <span className="text-[10px] bg-purple-50 text-purple-600 font-semibold px-2 py-0.5 rounded-full">Most FCs: {mostFCs.name} ({mostFCs.outs.FC})</span>
+                      )}
+                      {mostGrounders && mostGrounders.outs.G > 0 && (
+                        <span className="text-[10px] bg-yellow-50 text-yellow-700 font-semibold px-2 py-0.5 rounded-full">Most Groundouts: {mostGrounders.name} ({mostGrounders.outs.G})</span>
+                      )}
+                    </div>
+                    {/* Visual bars per player */}
+                    <div className="space-y-2">
+                      {playersWithOuts.map(p => {
+                        const barW = (p.totalOuts / maxOuts) * 100
+                        return (
+                          <div key={p.name}>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-xs font-semibold text-gray-700 truncate">{p.name}</span>
+                              <span className="text-[10px] text-gray-400">{p.totalOuts} out{p.totalOuts !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="flex h-4 rounded-sm overflow-hidden bg-gray-100" style={{ width: `${Math.max(barW, 15)}%` }}>
+                              {OUT_TYPES.map(t => {
+                                if (p.outs[t] === 0) return null
+                                const pct = (p.outs[t] / p.totalOuts) * 100
+                                return (
+                                  <div
+                                    key={t}
+                                    className="h-full flex items-center justify-center text-white text-[8px] font-bold"
+                                    style={{ width: `${pct}%`, backgroundColor: OUT_COLORS[t], minWidth: p.outs[t] > 0 ? 14 : 0 }}
+                                    title={`${OUT_LABELS[t]}: ${p.outs[t]}`}
+                                  >
+                                    {pct >= 15 ? t : ''}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="flex flex-wrap gap-3 mt-2 text-[10px] text-gray-400">
+                      {OUT_TYPES.map(t => (
+                        <span key={t} className="flex items-center gap-1">
+                          <span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: OUT_COLORS[t] }} />{OUT_LABELS[t]}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {insights.length === 0 && (
+                  <p className="text-gray-400 text-sm text-center py-6">Play some games to see coaching insights</p>
+                )}
+              </div>
+            )
+          })()}
+
         </div>
       )}
 
