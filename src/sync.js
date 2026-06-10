@@ -35,6 +35,8 @@ export function generateShortId(teamName) {
 }
 
 // ── Key map: localStorage key → Supabase remote key ──────────
+// sft_pin is excluded — the authoritative copy lives in teams.pin_hash.
+// sft_team and sft_setup_drafts are also excluded (identity/ephemeral).
 export const SYNC_KEYS = {
   sft_roster:       'roster',
   sft_games:        'games',
@@ -84,6 +86,8 @@ export async function pushAllLocalData(teamId) {
 }
 
 // ── Pull all team data from Supabase into localStorage ────────
+// Overwrites local keys unconditionally — no timestamp comparison.
+// Intended for initial device load only; do not use for background sync.
 export async function pullAllData(teamId) {
   if (!teamId || teamId === 'local') return
   const client = getSupabase()

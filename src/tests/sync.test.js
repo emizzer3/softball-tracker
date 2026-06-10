@@ -207,10 +207,8 @@ describe('loadTeamByShortId', () => {
         })),
       })),
     }
-    // pullAllData will call from() too — make it return empty
-    mockFrom
-      .mockReturnValueOnce(mockSelectChain)
-      .mockReturnValue({ select: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: [], error: null })) })) })
+    // PIN check happens before pullAllData — only the teams lookup is needed
+    mockFrom.mockReturnValueOnce(mockSelectChain)
 
     await expect(loadTeamByShortId('TES-1234', '9999'))
       .rejects.toThrow('Wrong PIN')
