@@ -132,7 +132,7 @@ function formatShareText(game) {
   const lines = [
     `${away} @ ${home}`,
     `${date} · ${gameType}`,
-    `Final: ${homeScore ?? 0}–${awayScore ?? 0}`,
+    `Final: ${awayScore ?? 0}–${homeScore ?? 0}`,
     '',
     'Batting:',
   ]
@@ -162,7 +162,7 @@ export default function ScoresheetPage({ game, onHome, onSummary }) {
     if (navigator.share) {
       try { await navigator.share({ title, text }) } catch { /* user cancelled */ }
     } else if (navigator.clipboard) {
-      await navigator.clipboard.writeText(`${title}\n\n${text}`).catch(() => {})
+      await navigator.clipboard.writeText(text).catch(() => {})
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }

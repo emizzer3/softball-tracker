@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import ScoresheetPage from '../pages/ScoresheetPage'
 
@@ -46,8 +46,7 @@ describe('ScoresheetPage share', () => {
     const call = mockShare.mock.calls[0][0]
     expect(call.title).toContain('Bulls')
     expect(call.title).toContain('Renegades')
-    expect(call.text).toContain('8')   // home score
-    expect(call.text).toContain('5')   // away score
+    expect(call.text).toContain('Final: 5–8')  // away (Bulls=5) – home (Renegades=8)
     expect(call.text).toContain('Alice')
     vi.unstubAllGlobals()
   })
