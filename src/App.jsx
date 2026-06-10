@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AdminPage from './pages/AdminPage'
 import GameSetupPage from './pages/GameSetupPage'
 import TrackerPage from './pages/TrackerPage'
@@ -6,7 +6,9 @@ import ScoresheetPage from './pages/ScoresheetPage'
 import SummaryPage from './pages/SummaryPage'
 import SeasonStatsPage from './pages/SeasonStatsPage'
 import OnboardingPage from './pages/OnboardingPage'
+import CloudConnectPage from './pages/CloudConnectPage'
 import { saveGame, getActiveGame, clearActiveGame, getSchedule, saveSetupDraft, getSetupDraft, getAllSetupDrafts, getTeamConfig, setTeamConfig, getDivision } from './storage'
+import { pushKey, pullAllData } from './sync'
 import { Settings, Plus, BarChart2, CalendarDays, ChevronRight } from 'lucide-react'
 
 const P = { HOME: 'home', ADMIN: 'admin', SETUP: 'setup', TRACKER: 'tracker', SCORESHEET: 'scoresheet', SUMMARY: 'summary', SEASON: 'season' }
@@ -139,9 +141,25 @@ function initAndMigrate() {
 
 export default function App() {
   const [onboarded, setOnboarded] = useState(initAndMigrate)
+  const [cloudConnected, setCloudConnected] = useState(() => {
+    return !!getTeamConfig()?.teamId
+  })
+
+  // Pull latest data from Supabase on mount (background, no reload).
+  // Keeps local cache fresh when the team uses multiple devices.
+  useEffect(() => {
+    const teamId = getTeamConfig()?.teamId
+    if (teamId && teamId !== 'local') {
+      pullAllData(teamId).catch(console.warn)
+    }
+  }, [])
 
   if (!onboarded) {
     return <OnboardingPage onComplete={() => setOnboarded(true)} />
+  }
+
+  if (!cloudConnected) {
+    return <CloudConnectPage onComplete={() => setCloudConnected(true)} />
   }
 
   const [page, setPage] = useState(P.HOME)
@@ -206,6 +224,7 @@ export default function App() {
     const result = ourScore > theirScore ? 'W' : ourScore < theirScore ? 'L' : 'D'
     const gameWithResult = { ...completedGame, result }
     saveGame(gameWithResult)
+    pushKey('sft_games').catch(console.warn)
     clearActiveGame()
     setFinishedGame(gameWithResult)
     setCurrentSetup(null)
