@@ -400,7 +400,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 {runs.length >= 2 && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Runs Scored vs Allowed</p>
-                    <div className="flex items-end gap-1" style={{ height: BAR_H + 44 }}>
+                    <div className="grid items-end gap-1" style={{ height: BAR_H + 44, gridTemplateColumns: `repeat(${runs.length}, 1fr)` }}>
                       {runs.map(g => {
                         const ourH    = Math.max(Math.round((g.ourRuns   / maxRuns) * BAR_H), 4)
                         const theirH  = Math.max(Math.round((g.theirRuns / maxRuns) * BAR_H), 4)
@@ -409,14 +409,13 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                         return (
                           <div
                             key={g.gameId}
-                            className="flex flex-col items-center flex-1 cursor-pointer"
-                            style={{ minWidth: 28, maxWidth: 56 }}
+                            className="flex flex-col items-center cursor-pointer self-end"
                             onClick={() => setTappedBar(active ? null : g.gameId)}
                           >
                             <span className="text-[10px] font-bold text-gray-600 leading-none mb-1">{g.ourRuns}–{g.theirRuns}</span>
                             <div className="flex items-end gap-px w-full justify-center" style={{ height: BAR_H }}>
-                              <div className="flex-1 max-w-5 rounded-t-sm transition-all" style={{ height: ourH, backgroundColor: barColor, opacity: active ? 1 : 0.8 }} />
-                              <div className="flex-1 max-w-5 rounded-t-sm bg-gray-200 transition-all" style={{ height: theirH, opacity: active ? 1 : 0.6 }} />
+                              <div className="flex-1 rounded-t-sm transition-all" style={{ height: ourH, backgroundColor: barColor, opacity: active ? 1 : 0.8 }} />
+                              <div className="flex-1 rounded-t-sm bg-gray-200 transition-all" style={{ height: theirH, opacity: active ? 1 : 0.6 }} />
                             </div>
                             <span className="text-[10px] text-gray-400 leading-tight mt-1 text-center w-full truncate">{g.date.slice(5)}</span>
                             <span className="text-[9px] text-gray-300 leading-none text-center w-full truncate">{g.opponent}</span>
@@ -441,7 +440,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 {battingByGame.length >= 2 && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Hits by Type per Game</p>
-                    <div className="flex items-end gap-1" style={{ height: BAR_H + 44 }}>
+                    <div className="grid items-end gap-1" style={{ height: BAR_H + 44, gridTemplateColumns: `repeat(${battingByGame.length}, 1fr)` }}>
                       {battingByGame.map(g => {
                         const totalH  = Math.max(Math.round((g.total / maxHits) * BAR_H), 4)
                         const hrsH    = g.total > 0 ? Math.round((g.hrs     / g.total) * totalH) : 0
@@ -452,12 +451,11 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                         return (
                           <div
                             key={g.gameId}
-                            className="flex flex-col items-center flex-1 cursor-pointer"
-                            style={{ minWidth: 28, maxWidth: 56 }}
+                            className="flex flex-col items-center cursor-pointer self-end"
                             onClick={() => setTappedBar(active ? null : g.gameId)}
                           >
                             <span className="text-[10px] font-bold text-gray-600 leading-none mb-1">{g.total}</span>
-                            <div className="flex flex-col-reverse rounded-t-sm overflow-hidden w-full max-w-8 mx-auto transition-all" style={{ height: Math.max(totalH, 4), opacity: active ? 1 : 0.8 }}>
+                            <div className="flex flex-col-reverse rounded-t-sm overflow-hidden w-full transition-all" style={{ height: Math.max(totalH, 4), opacity: active ? 1 : 0.8 }}>
                               {sngH > 0 && <div style={{ height: sngH, backgroundColor: '#bae6fd' }} />}
                               {dblH > 0 && <div style={{ height: dblH, backgroundColor: '#3b82f6' }} />}
                               {triH > 0 && <div style={{ height: triH, backgroundColor: '#7c3aed' }} />}
