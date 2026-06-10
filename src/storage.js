@@ -276,6 +276,52 @@ export function computePlayerGameLog(playerName) {
   return rows.sort((a, b) => a.date.localeCompare(b.date))
 }
 
+// ── Team runs per game (for trend chart in SeasonStatsPage) ──────────────
+export function computeRunsPerGame() {
+  return getGames()
+    .filter(g => g.date)
+    .map(g => {
+      const weAreHome = g.setup?.weAreHome !== false
+      const ourRuns   = weAreHome ? (g.homeScore ?? 0) : (g.awayScore ?? 0)
+      const theirRuns = weAreHome ? (g.awayScore ?? 0) : (g.homeScore ?? 0)
+      const opponent  = weAreHome ? g.away : g.home
+      return { gameId: g.id, date: g.date, ourRuns, theirRuns, result: g.result || '—', opponent }
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
+
+// ── BBH vs SBH aggregate batting stats ───────────────────────────────────
+export function computeGroupStats() {
+  const roster = getRoster()
+  const typeMap = Object.fromEntries(roster.map(p => [p.name, p.type]))  // name → 'BBH'|'SBH'
+  const season = computeSeasonStats()  // already computed; reuse
+
+  const groups = { BBH: { AB: 0, H: 0, BB: 0, HR: 0, RBI: 0, K: 0, players: 0 },
+                   SBH: { AB: 0, H: 0, BB: 0, HR: 0, RBI: 0, K: 0, players: 0 } }
+
+  for (const p of season) {
+    const type = typeMap[p.name]
+    if (!type || !groups[type]) continue
+    const g = groups[type]
+    g.AB  += p.AB;  g.H   += p.H;   g.BB  += p.BB
+    g.HR  += p.HR;  g.RBI += p.RBI; g.K   += p.K
+    g.players++
+  }
+
+  return Object.entries(groups).map(([type, g]) => ({
+    type,
+    players: g.players,
+    AB:  g.AB,
+    H:   g.H,
+    HR:  g.HR,
+    RBI: g.RBI,
+    BB:  g.BB,
+    K:   g.K,
+    AVG: g.AB > 0 ? (g.H / g.AB).toFixed(3).replace(/^0/, '') : '.000',
+    OBP: (g.AB + g.BB) > 0 ? ((g.H + g.BB) / (g.AB + g.BB)).toFixed(3).replace(/^0/, '') : '.000',
+  }))
+}
+
 // ── Season W/L/D record ───────────────────────────────────────
 export function getSeasonRecord() {
   const games = getGames()

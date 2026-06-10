@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Trophy, Calendar, Home, Trash2, BookOpen, X } from 'lucide-react'
-import { getGames, computeSeasonStats, computePlayerGameLog, deleteGame, getSeasonRecord } from '../storage'
+import { getGames, computeSeasonStats, computePlayerGameLog, deleteGame, getSeasonRecord, computeRunsPerGame, computeGroupStats } from '../storage'
 
 const STAT_TIPS = {
   G:    { label: 'Games',           desc: 'Number of games this player batted in.' },
@@ -136,6 +136,19 @@ function PlayerDetailModal({ name, onClose }) {
   )
 }
 
+function getStreak(p) {
+  const log = computePlayerGameLog(p.name)
+  if (log.length < 3) return null
+  const last3 = log.slice(-3)
+  const last3AB = last3.reduce((s, g) => s + g.AB, 0)
+  const last3H  = last3.reduce((s, g) => s + g.H,  0)
+  const last3Avg = last3AB > 0 ? last3H / last3AB : 0
+  const seasonAvg = p.AB > 0 ? p.H / p.AB : 0
+  if (last3Avg >= seasonAvg + 0.080) return '🔥'
+  if (last3Avg <= seasonAvg - 0.080) return '🥶'
+  return null
+}
+
 export default function SeasonStatsPage({ onHome, onViewGame }) {
   const [games, setGames] = useState(getGames)
   const [activeTab, setActiveTab] = useState('batting')
@@ -244,6 +257,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                         onClick={() => setSelectedPlayer(p.name)}
                       >
                         {p.name}
+                        {getStreak(p) && <span className="ml-1 text-base leading-none">{getStreak(p)}</span>}
                       </td>
                       {[p.G, p.R || 0, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
                         <td key={i} className="py-1.5 px-0.5 text-center">{v}</td>
@@ -256,6 +270,44 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 </tbody>
               </table>
               <p className="text-xs text-gray-400 mt-2">AVG = H/AB · OBP = (H+BB)/(AB+BB) · SLG = total bases/AB</p>
+
+              {/* BBH vs SBH comparison */}
+              {(() => {
+                const groups = computeGroupStats()
+                if (groups.every(g => g.players === 0)) return null
+                return (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">BBH vs SBH</p>
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500">
+                          {['Group','AB','H','HR','RBI','BB','K','AVG','OBP'].map(h => (
+                            <th key={h} className={`py-1 font-semibold ${h === 'Group' ? 'text-left px-1' : 'text-center px-0.5'}`}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groups.map(g => (
+                          <tr key={g.type} className="border-b border-gray-100">
+                            <td className="py-1.5 px-1 font-semibold">
+                              <span className={g.type === 'BBH' ? 'badge-bbh' : 'badge-sbh'}>{g.type}</span>
+                              <span className="text-gray-400 ml-1 font-normal">({g.players})</span>
+                            </td>
+                            <td className="py-1.5 px-0.5 text-center">{g.AB}</td>
+                            <td className="py-1.5 px-0.5 text-center">{g.H}</td>
+                            <td className="py-1.5 px-0.5 text-center">{g.HR}</td>
+                            <td className="py-1.5 px-0.5 text-center">{g.RBI}</td>
+                            <td className="py-1.5 px-0.5 text-center">{g.BB}</td>
+                            <td className="py-1.5 px-0.5 text-center">{g.K}</td>
+                            <td className="py-1.5 px-0.5 text-center text-indigo-600 font-medium">{g.AVG}</td>
+                            <td className="py-1.5 px-0.5 text-center text-indigo-500">{g.OBP}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -291,6 +343,36 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
           )}
         </div>
       )}
+
+      {/* Runs per game chart */}
+      {(() => {
+        const runs = computeRunsPerGame()
+        if (runs.length < 2) return null
+        const maxRuns = Math.max(...runs.map(g => Math.max(g.ourRuns, g.theirRuns)), 1)
+        return (
+          <div className="card mb-4 p-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Runs Per Game</p>
+            <div className="flex items-end gap-1 h-20 overflow-x-auto pb-1">
+              {runs.map(g => {
+                const heightPct = Math.round((g.ourRuns / maxRuns) * 100)
+                const color = g.result === 'W' ? 'bg-green-500' : g.result === 'L' ? 'bg-red-400' : 'bg-gray-400'
+                return (
+                  <div key={g.gameId} className="flex flex-col items-center gap-0.5 shrink-0" style={{ minWidth: 24 }}>
+                    <span className="text-xs font-bold text-gray-700 leading-none">{g.ourRuns}</span>
+                    <div className={`w-5 rounded-sm ${color}`} style={{ height: `${Math.max(heightPct, 8)}%` }} title={`${g.opponent} · ${g.ourRuns}–${g.theirRuns}`} />
+                    <span className="text-[9px] text-gray-400 leading-none truncate w-5 text-center">{g.date.slice(5)}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex gap-3 mt-1 text-[10px] text-gray-400">
+              <span><span className="inline-block w-2 h-2 rounded-sm bg-green-500 mr-0.5" />W</span>
+              <span><span className="inline-block w-2 h-2 rounded-sm bg-red-400 mr-0.5" />L</span>
+              <span><span className="inline-block w-2 h-2 rounded-sm bg-gray-400 mr-0.5" />D</span>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Game history */}
       <div className="card">
