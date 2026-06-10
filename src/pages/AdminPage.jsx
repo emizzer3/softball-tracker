@@ -305,6 +305,7 @@ function TeamIdSection() {
   const config = getTeamConfig()
   const shortId = config?.shortId
   const [copied, setCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   if (!shortId || config?.teamId === 'local') return null
 
@@ -329,6 +330,20 @@ function TeamIdSection() {
           {copied ? '✓ Copied' : 'Copy'}
         </button>
       </div>
+      <button
+        onClick={() => {
+          const url = `${window.location.origin}${window.location.pathname}?view=${shortId}`
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(() => {
+              setLinkCopied(true)
+              setTimeout(() => setLinkCopied(false), 1500)
+            }).catch(() => {})
+          }
+        }}
+        className="btn btn-ghost btn-sm text-xs mt-1"
+      >
+        {linkCopied ? '✅ Copied!' : '🔗 Copy viewer link'}
+      </button>
     </div>
   )
 }
