@@ -309,10 +309,12 @@ function TeamIdSection() {
   if (!shortId || config?.teamId === 'local') return null
 
   function handleCopy() {
-    navigator.clipboard.writeText(shortId).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shortId).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      }).catch(() => {})
+    }
   }
 
   return (
