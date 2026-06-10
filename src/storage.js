@@ -169,7 +169,11 @@ export function importAllData(data) {
   saveTeams(         data.teams       || DEFAULT_TEAMS)
   set(K.TOURNAMENTS, data.tournaments || [])
   if (data.schedule) saveSchedule(data.schedule)
-  if (data.teamConfig) setTeamConfig(data.teamConfig)
+  if (data.teamConfig) {
+    // Preserve teamId/shortId from current install — backup files predate cloud sync
+    const existing = getTeamConfig()
+    setTeamConfig({ ...data.teamConfig, teamId: existing?.teamId, shortId: existing?.shortId })
+  }
 }
 
 // ── Season stats (derived, not stored — computed from games) ──
