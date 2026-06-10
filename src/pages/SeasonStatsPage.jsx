@@ -136,6 +136,60 @@ function PlayerDetailModal({ name, onClose }) {
   )
 }
 
+// ── Spray chart (same geometry as ScoresheetPage) ────────────────────────────
+const SPRAY_COLORS = {
+  '1B': '#22c55e', '2B': '#16a34a', '3B': '#15803d', 'HR': '#052e16',
+  'F':  '#ef4444', 'G':  '#dc2626', 'SAC': '#f97316',
+  'E':  '#f59e0b', 'FC': '#d97706',
+}
+const FW = 280, FH = 260
+const FH_PT = [140, 250]
+const F1B = [210, 180], F2B = [140, 151], F3B = [70, 180]
+const FLF = [9, 119], FRF = [271, 119]
+
+const OUTCOME_LABELS = { '1B': 'Single', '2B': 'Double', '3B': 'Triple', 'HR': 'Home Run', 'F': 'Flyout', 'G': 'Groundout', 'E': 'Error', 'FC': "FC", 'SAC': 'Sacrifice' }
+
+function SprayDiamond({ dots, label, highlightBatter, onDotTap, selectedIdx }) {
+  return (
+    <div>
+      {label && <p className="text-[10px] text-gray-500 text-center mb-0.5 font-medium truncate">{label}</p>}
+      <svg viewBox={`0 0 ${FW} ${FH}`} className="w-full">
+        <path d={`M ${FH_PT[0]},${FH_PT[1]} L ${FLF[0]},${FLF[1]} A 185,185 0 0,1 ${FRF[0]},${FRF[1]} Z`} fill="#86efac" opacity="0.35" />
+        <circle cx={140} cy={200} r={73} fill="#d4a264" opacity="0.3" />
+        <line x1={FH_PT[0]} y1={FH_PT[1]} x2={FLF[0]} y2={FLF[1]} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 3" />
+        <line x1={FH_PT[0]} y1={FH_PT[1]} x2={FRF[0]} y2={FRF[1]} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 3" />
+        <path d={`M ${FLF[0]},${FLF[1]} A 185,185 0 0,1 ${FRF[0]},${FRF[1]}`} fill="none" stroke="#94a3b8" strokeWidth={1.5} />
+        <line x1={FH_PT[0]} y1={FH_PT[1]} x2={F1B[0]} y2={F1B[1]} stroke="#475569" strokeWidth={1.5} />
+        <line x1={F1B[0]} y1={F1B[1]} x2={F2B[0]} y2={F2B[1]} stroke="#475569" strokeWidth={1.5} />
+        <line x1={F2B[0]} y1={F2B[1]} x2={F3B[0]} y2={F3B[1]} stroke="#475569" strokeWidth={1.5} />
+        <line x1={F3B[0]} y1={F3B[1]} x2={FH_PT[0]} y2={FH_PT[1]} stroke="#475569" strokeWidth={1.5} />
+        <circle cx={140} cy={200} r={9} fill="#c9a87c" stroke="#a07840" strokeWidth={1} />
+        {[F1B, F2B, F3B].map(([bx, by], i) => (
+          <rect key={i} x={bx-6} y={by-6} width={12} height={12} transform={`rotate(45,${bx},${by})`} fill="white" stroke="#475569" strokeWidth={1.5} />
+        ))}
+        <polygon points={`${FH_PT[0]},${FH_PT[1]-9} ${FH_PT[0]-8},${FH_PT[1]-3} ${FH_PT[0]-6},${FH_PT[1]+7} ${FH_PT[0]+6},${FH_PT[1]+7} ${FH_PT[0]+8},${FH_PT[1]-3}`} fill="#64748b" />
+        {dots.map((d, i) => {
+          const dimmed = highlightBatter && d.batter !== highlightBatter
+          const isSelected = selectedIdx === i
+          const r = dots.length > 50 ? 5 : 7
+          return (
+            <g key={i} style={{ cursor: onDotTap ? 'pointer' : 'default' }} onClick={onDotTap ? () => onDotTap(i) : undefined}>
+              <circle cx={d.x} cy={d.y} r={r} fill={SPRAY_COLORS[d.outcome] || '#6b7280'} stroke={isSelected ? '#000' : 'white'} strokeWidth={isSelected ? 2.5 : 1} opacity={dimmed ? 0.15 : 0.85} />
+              {isSelected && (
+                <>
+                  <rect x={d.x + r + 3} y={d.y - 18} width={Math.max((d.batter || '').length * 7, 50) + 10} height={32} rx={5} fill="white" stroke="#94a3b8" strokeWidth={1} />
+                  <text x={d.x + r + 8} y={d.y - 4} fontSize={10} fontWeight="bold" fill="#1e293b">{d.batter}</text>
+                  <text x={d.x + r + 8} y={d.y + 9} fontSize={9} fill="#64748b">{OUTCOME_LABELS[d.outcome] || d.outcome}</text>
+                </>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 function getStreak(p) {
   const log = computePlayerGameLog(p.name)
   if (log.length < 3) return null
@@ -156,6 +210,9 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
   const [sortCol, setSortCol] = useState('AB')
   const [sortAsc, setSortAsc] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState(null)
+  const [sprayFilter, setSprayFilter] = useState(null)   // batter name or null
+  const [selectedDot, setSelectedDot] = useState(null)    // dot index or null
+  const [tappedBar, setTappedBar] = useState(null)        // gameId or null
 
   function handleSort(col) {
     if (sortCol === col) setSortAsc(a => !a)
@@ -221,6 +278,12 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'fielding' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 🧤 Fielding
+              </button>
+              <button
+                onClick={() => setActiveTab('trends')}
+                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'trends' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                📈 Trends
               </button>
             </div>
             <button onClick={() => setShowGuide(true)} className="btn btn-ghost btn-sm text-xs gap-1 text-blue-500 py-0.5">
@@ -341,109 +404,192 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
               <p className="text-xs text-gray-400 mt-2">PO = putouts · A = assists · E = errors</p>
             </div>
           )}
+
+          {/* Trends tab */}
+          {activeTab === 'trends' && (() => {
+            const runs = computeRunsPerGame()
+            const sortedGames = games.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+            const battingByGame = sortedGames
+              .filter(g => g.atBats?.length > 0)
+              .map(g => {
+                const abs = g.atBats || []
+                const singles = abs.filter(ab => ab.outcome === '1B').length
+                const doubles = abs.filter(ab => ab.outcome === '2B').length
+                const triples = abs.filter(ab => ab.outcome === '3B').length
+                const hrs     = abs.filter(ab => ab.outcome === 'HR').length
+                return { gameId: g.id, date: g.date, singles, doubles, triples, hrs, total: singles + doubles + triples + hrs, result: g.result }
+              })
+
+            // Spray chart data: collect all hit dots across all games (include batter for interactivity)
+            const allDots = sortedGames.flatMap(g =>
+              (g.atBats || []).filter(ab => ab.hitLocation).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter }))
+            )
+            const sprayBatters = [...new Set(allDots.map(d => d.batter).filter(Boolean))]
+            const perGameSpray = sortedGames
+              .filter(g => (g.atBats || []).some(ab => ab.hitLocation))
+              .map(g => ({
+                gameId: g.id,
+                date: g.date,
+                opponent: g.setup?.weAreHome !== false ? g.away : g.home,
+                result: g.result,
+                dots: (g.atBats || []).filter(ab => ab.hitLocation).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter })),
+              }))
+
+            const maxRuns = runs.length > 0 ? Math.max(...runs.map(g => Math.max(g.ourRuns, g.theirRuns)), 1) : 1
+            const maxHits = battingByGame.length > 0 ? Math.max(...battingByGame.map(g => g.total), 1) : 1
+            const BAR_H = 100
+
+            return (
+              <div className="space-y-6">
+                {/* Runs per game */}
+                {runs.length >= 2 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Runs Scored vs Allowed</p>
+                    <div className="flex items-end gap-1" style={{ height: BAR_H + 44 }}>
+                      {runs.map(g => {
+                        const ourH    = Math.max(Math.round((g.ourRuns   / maxRuns) * BAR_H), 4)
+                        const theirH  = Math.max(Math.round((g.theirRuns / maxRuns) * BAR_H), 4)
+                        const barColor = g.result === 'W' ? '#22c55e' : g.result === 'L' ? '#f87171' : '#9ca3af'
+                        const active = tappedBar === g.gameId
+                        return (
+                          <div
+                            key={g.gameId}
+                            className="flex flex-col items-center flex-1 cursor-pointer"
+                            style={{ minWidth: 28, maxWidth: 56 }}
+                            onClick={() => setTappedBar(active ? null : g.gameId)}
+                          >
+                            <span className="text-[10px] font-bold text-gray-600 leading-none mb-1">{g.ourRuns}–{g.theirRuns}</span>
+                            <div className="flex items-end gap-px w-full justify-center" style={{ height: BAR_H }}>
+                              <div className="flex-1 max-w-5 rounded-t-sm transition-all" style={{ height: ourH, backgroundColor: barColor, opacity: active ? 1 : 0.8 }} />
+                              <div className="flex-1 max-w-5 rounded-t-sm bg-gray-200 transition-all" style={{ height: theirH, opacity: active ? 1 : 0.6 }} />
+                            </div>
+                            <span className="text-[10px] text-gray-400 leading-tight mt-1 text-center w-full truncate">{g.date.slice(5)}</span>
+                            <span className="text-[9px] text-gray-300 leading-none text-center w-full truncate">{g.opponent}</span>
+                            {active && (
+                              <span className={`text-[9px] font-bold mt-0.5 ${g.result === 'W' ? 'text-green-600' : g.result === 'L' ? 'text-red-500' : 'text-gray-500'}`}>
+                                {g.result === 'W' ? 'Win' : g.result === 'L' ? 'Loss' : 'Draw'}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="flex gap-4 mt-1.5 text-[10px] text-gray-400">
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-green-500" />Us (W)</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-red-400" />Us (L)</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-gray-200" />Them</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Batting spread — hit type breakdown per game */}
+                {battingByGame.length >= 2 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Hits by Type per Game</p>
+                    <div className="flex items-end gap-1" style={{ height: BAR_H + 44 }}>
+                      {battingByGame.map(g => {
+                        const totalH  = Math.max(Math.round((g.total / maxHits) * BAR_H), 4)
+                        const hrsH    = g.total > 0 ? Math.round((g.hrs     / g.total) * totalH) : 0
+                        const triH    = g.total > 0 ? Math.round((g.triples / g.total) * totalH) : 0
+                        const dblH    = g.total > 0 ? Math.round((g.doubles / g.total) * totalH) : 0
+                        const sngH    = Math.max(totalH - hrsH - triH - dblH, 0)
+                        const active = tappedBar === g.gameId
+                        return (
+                          <div
+                            key={g.gameId}
+                            className="flex flex-col items-center flex-1 cursor-pointer"
+                            style={{ minWidth: 28, maxWidth: 56 }}
+                            onClick={() => setTappedBar(active ? null : g.gameId)}
+                          >
+                            <span className="text-[10px] font-bold text-gray-600 leading-none mb-1">{g.total}</span>
+                            <div className="flex flex-col-reverse rounded-t-sm overflow-hidden w-full max-w-8 mx-auto transition-all" style={{ height: Math.max(totalH, 4), opacity: active ? 1 : 0.8 }}>
+                              {sngH > 0 && <div style={{ height: sngH, backgroundColor: '#bae6fd' }} />}
+                              {dblH > 0 && <div style={{ height: dblH, backgroundColor: '#3b82f6' }} />}
+                              {triH > 0 && <div style={{ height: triH, backgroundColor: '#7c3aed' }} />}
+                              {hrsH > 0 && <div style={{ height: hrsH, backgroundColor: '#f59e0b' }} />}
+                            </div>
+                            <span className="text-[10px] text-gray-400 leading-tight mt-1 text-center w-full truncate">{g.date.slice(5)}</span>
+                            <span className={`text-[9px] font-bold leading-none ${g.result === 'W' ? 'text-green-500' : g.result === 'L' ? 'text-red-400' : 'text-gray-400'}`}>{g.result}</span>
+                            {active && (
+                              <span className="text-[9px] text-gray-500 mt-0.5">{g.singles}×1B {g.doubles}×2B {g.triples}×3B {g.hrs}×HR</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="flex gap-4 mt-1.5 text-[10px] text-gray-400">
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#bae6fd' }} />1B</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#3b82f6' }} />2B</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#7c3aed' }} />3B</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />HR</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Season spray chart — aggregate with player filter */}
+                {allDots.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Season Spray Chart</p>
+                    {sprayBatters.length > 1 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        <button
+                          onClick={() => { setSprayFilter(null); setSelectedDot(null) }}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${!sprayFilter ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        >All</button>
+                        {sprayBatters.sort().map(name => (
+                          <button
+                            key={name}
+                            onClick={() => { setSprayFilter(sprayFilter === name ? null : name); setSelectedDot(null) }}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${sprayFilter === name ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                          >{name}</button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="max-w-sm mx-auto">
+                      <SprayDiamond
+                        dots={allDots}
+                        highlightBatter={sprayFilter}
+                        onDotTap={(i) => setSelectedDot(selectedDot === i ? null : i)}
+                        selectedIdx={selectedDot}
+                      />
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-3 mt-2 text-[10px] text-gray-400">
+                      {[['#22c55e','1B'],['#16a34a','2B'],['#15803d','3B'],['#052e16','HR'],['#ef4444','Flyout'],['#dc2626','Ground'],['#f59e0b','E/FC']].map(([c,l]) => (
+                        <span key={l} className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: c }} />{l}</span>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-300 text-center mt-1">
+                      {sprayFilter ? `${allDots.filter(d => d.batter === sprayFilter).length} hits by ${sprayFilter}` : `${allDots.length} hit${allDots.length !== 1 ? 's' : ''} across ${perGameSpray.length} game${perGameSpray.length !== 1 ? 's' : ''}`}
+                      {' · tap a dot for details'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Per-game spray chart grid */}
+                {perGameSpray.length >= 2 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Spray Chart by Game</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {perGameSpray.map(g => (
+                        <div key={g.gameId} className="border border-gray-100 rounded-lg p-1.5">
+                          <SprayDiamond dots={g.dots} highlightBatter={sprayFilter} label={`${g.date.slice(5)} vs ${g.opponent}`} />
+                          <p className={`text-[10px] text-center font-bold mt-0.5 ${g.result === 'W' ? 'text-green-500' : g.result === 'L' ? 'text-red-400' : 'text-gray-400'}`}>
+                            {g.result} · {sprayFilter ? `${g.dots.filter(d => d.batter === sprayFilter).length}/${g.dots.length}` : `${g.dots.length} hit${g.dots.length !== 1 ? 's' : ''}`}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {runs.length < 2 && allDots.length === 0 && (
+                  <p className="text-gray-400 text-sm text-center py-6">Play at least 2 games to see trends</p>
+                )}
+              </div>
+            )
+          })()}
         </div>
       )}
-
-      {/* Team trends charts */}
-      {(() => {
-        const runs = computeRunsPerGame()
-        const allGames = games.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''))
-        const battingByGame = allGames
-          .filter(g => g.atBats?.length > 0)
-          .map(g => {
-            const abs = g.atBats || []
-            const singles = abs.filter(ab => ab.outcome === '1B').length
-            const doubles = abs.filter(ab => ab.outcome === '2B').length
-            const triples = abs.filter(ab => ab.outcome === '3B').length
-            const hrs     = abs.filter(ab => ab.outcome === 'HR').length
-            return { gameId: g.id, date: g.date, singles, doubles, triples, hrs, total: singles + doubles + triples + hrs, result: g.result }
-          })
-
-        if (runs.length < 2) return null
-
-        const maxRuns = Math.max(...runs.map(g => Math.max(g.ourRuns, g.theirRuns)), 1)
-        const maxHits = Math.max(...battingByGame.map(g => g.total), 1)
-        const BAR_H = 80 // px, the drawable bar area
-
-        return (
-          <div className="card mb-4 p-3 space-y-5">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Team Trends</p>
-
-            {/* Runs per game */}
-            <div>
-              <p className="text-xs text-gray-400 mb-2">Runs scored vs allowed</p>
-              <div className="overflow-x-auto">
-                <div className="flex items-end gap-2 pb-1" style={{ height: BAR_H + 40 }}>
-                  {runs.map(g => {
-                    const ourH    = Math.max(Math.round((g.ourRuns   / maxRuns) * BAR_H), 4)
-                    const theirH  = Math.max(Math.round((g.theirRuns / maxRuns) * BAR_H), 4)
-                    const barColor = g.result === 'W' ? '#22c55e' : g.result === 'L' ? '#f87171' : '#9ca3af'
-                    return (
-                      <div key={g.gameId} className="flex flex-col items-center shrink-0" style={{ width: 36 }}>
-                        {/* Score label */}
-                        <span className="text-[10px] font-bold text-gray-600 leading-none mb-1">
-                          {g.ourRuns}–{g.theirRuns}
-                        </span>
-                        {/* Bars */}
-                        <div className="flex items-end gap-0.5" style={{ height: BAR_H }}>
-                          <div className="w-3.5 rounded-t-sm transition-all" style={{ height: ourH, backgroundColor: barColor }} title={`Us: ${g.ourRuns}`} />
-                          <div className="w-3.5 rounded-t-sm bg-gray-200" style={{ height: theirH }} title={`${g.opponent}: ${g.theirRuns}`} />
-                        </div>
-                        {/* Date */}
-                        <span className="text-[10px] text-gray-400 leading-tight mt-1 text-center w-full truncate">{g.date.slice(5)}</span>
-                        {/* Opponent */}
-                        <span className="text-[9px] text-gray-300 leading-none text-center w-full truncate">{g.opponent}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              <div className="flex gap-4 mt-1 text-[10px] text-gray-400">
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-green-500" />Us (W)</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-red-400" />Us (L)</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm bg-gray-200" />Them</span>
-              </div>
-            </div>
-
-            {/* Batting spread — hit type breakdown per game */}
-            {battingByGame.length >= 2 && (
-              <div>
-                <p className="text-xs text-gray-400 mb-2">Hits by type per game</p>
-                <div className="overflow-x-auto">
-                  <div className="flex items-end gap-2 pb-1" style={{ height: BAR_H + 40 }}>
-                    {battingByGame.map(g => {
-                      const totalH  = Math.max(Math.round((g.total   / maxHits) * BAR_H), 4)
-                      const hrsH    = g.total > 0 ? Math.round((g.hrs     / g.total) * totalH) : 0
-                      const triH    = g.total > 0 ? Math.round((g.triples / g.total) * totalH) : 0
-                      const dblH    = g.total > 0 ? Math.round((g.doubles / g.total) * totalH) : 0
-                      const sngH    = Math.max(totalH - hrsH - triH - dblH, 0)
-                      return (
-                        <div key={g.gameId} className="flex flex-col items-center shrink-0" style={{ width: 36 }}>
-                          <span className="text-[10px] font-bold text-gray-600 leading-none mb-1">{g.total}</span>
-                          <div className="flex flex-col-reverse w-7 rounded-t-sm overflow-hidden" style={{ height: Math.max(totalH, 4) }}>
-                            {sngH > 0 && <div style={{ height: sngH, backgroundColor: '#bae6fd' }} title={`1B: ${g.singles}`} />}
-                            {dblH > 0 && <div style={{ height: dblH, backgroundColor: '#3b82f6' }} title={`2B: ${g.doubles}`} />}
-                            {triH > 0 && <div style={{ height: triH, backgroundColor: '#7c3aed' }} title={`3B: ${g.triples}`} />}
-                            {hrsH > 0 && <div style={{ height: hrsH, backgroundColor: '#f59e0b' }} title={`HR: ${g.hrs}`} />}
-                          </div>
-                          <span className="text-[10px] text-gray-400 leading-tight mt-1 text-center w-full truncate">{g.date.slice(5)}</span>
-                          <span className={`text-[9px] font-bold leading-none ${g.result === 'W' ? 'text-green-500' : g.result === 'L' ? 'text-red-400' : 'text-gray-400'}`}>{g.result}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="flex gap-4 mt-1 text-[10px] text-gray-400">
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#bae6fd' }} />1B</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#3b82f6' }} />2B</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#7c3aed' }} />3B</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />HR</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      })()}
 
       {/* Game history */}
       <div className="card">

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import SeasonStatsPage from '../pages/SeasonStatsPage'
 import * as storage from '../storage'
@@ -66,7 +66,7 @@ describe('hot/cold streak badge', () => {
 })
 
 describe('runs per game chart', () => {
-  it('shows Runs Per Game section when 2+ games exist', () => {
+  it('shows runs chart in Trends tab when 2+ games exist', () => {
     setupMocks({
       runs: [
         { gameId: 'g1', date: '2024-05-01', ourRuns: 7, theirRuns: 3, result: 'W', opponent: 'Bulls' },
@@ -74,13 +74,15 @@ describe('runs per game chart', () => {
       ],
     })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    expect(screen.getByText('Team Trends')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('📈 Trends'))
+    expect(screen.getByText('Runs Scored vs Allowed')).toBeInTheDocument()
   })
 
   it('hides chart when fewer than 2 games', () => {
     setupMocks({ runs: [] })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    expect(screen.queryByText('Team Trends')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('📈 Trends'))
+    expect(screen.queryByText('Runs Scored vs Allowed')).not.toBeInTheDocument()
   })
 })
 
