@@ -245,6 +245,37 @@ export function computeSeasonStats() {
   }).sort((a, b) => b.AB - a.AB)
 }
 
+// ── Per-player game log (for drill-down in SeasonStatsPage) ───────────────
+export function computePlayerGameLog(playerName) {
+  const games = getGames()
+  const rows = []
+
+  for (const game of games) {
+    const abs = (game.atBats || []).filter(ab => ab.batter === playerName)
+    if (abs.length === 0) continue
+
+    const AB    = abs.filter(ab => !['BB','HBP','SAC'].includes(ab.outcome)).length
+    const H     = abs.filter(ab => ['1B','2B','3B','HR'].includes(ab.outcome)).length
+    const twoB  = abs.filter(ab => ab.outcome === '2B').length
+    const threeB = abs.filter(ab => ab.outcome === '3B').length
+    const HR    = abs.filter(ab => ab.outcome === 'HR').length
+    const RBI   = abs.reduce((s, ab) => s + (ab.rbi || 0), 0)
+    const BB    = abs.filter(ab => ab.outcome === 'BB').length
+    const K     = abs.filter(ab => ab.outcome === 'K').length
+    const AVG   = AB > 0 ? (H / AB).toFixed(3).replace(/^0/, '') : '.000'
+
+    rows.push({
+      gameId:  game.id,
+      date:    game.date,
+      matchup: `${game.away} @ ${game.home}`,
+      result:  game.result || '—',
+      AB, H, '2B': twoB, '3B': threeB, HR, RBI, BB, K, AVG,
+    })
+  }
+
+  return rows.sort((a, b) => a.date.localeCompare(b.date))
+}
+
 // ── Season W/L/D record ───────────────────────────────────────
 export function getSeasonRecord() {
   const games = getGames()
