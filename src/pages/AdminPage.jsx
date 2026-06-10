@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { Lock, Plus, Trash2, ToggleLeft, ToggleRight, KeyRound, ChevronLeft, Trophy, Download, Upload, CalendarDays } from 'lucide-react'
-import { getRoster, addPlayer, updatePlayer, removePlayer, checkPin, setPin, getDivision, setDivision, getTeams, addTeam, removeTeam, exportAllData, importAllData, getSchedule, addFixture, removeFixture } from '../storage'
+import { getRoster, addPlayer, updatePlayer, removePlayer, checkPin, setPin, getDivision, setDivision, getTeams, addTeam, removeTeam, exportAllData, importAllData, getSchedule, addFixture, removeFixture, getTeamConfig } from '../storage'
+import { pushKey } from '../sync'
 
 function PinGate({ onUnlock }) {
   const [pin, setPin] = useState('')
@@ -106,6 +107,7 @@ function LeagueSettings() {
 
   function saveDivision() {
     setDivision(division)
+    pushKey('sft_division').catch(console.warn)
     setDivSaved(true)
     setTimeout(() => setDivSaved(false), 1500)
   }
@@ -115,11 +117,13 @@ function LeagueSettings() {
     const name = newTeam.trim()
     if (!name || teams.includes(name)) return
     setTeams(addTeam(name))
+    pushKey('sft_teams').catch(console.warn)
     setNewTeam('')
   }
 
   function handleRemoveTeam(name) {
     setTeams(removeTeam(name))
+    pushKey('sft_teams').catch(console.warn)
   }
 
   return (
@@ -186,6 +190,7 @@ function ScheduleSection() {
     e.preventDefault()
     if (!date || !opponent.trim()) return
     setFixtures(addFixture({ date, opponent: opponent.trim(), time, location, gameType }))
+    pushKey('sft_schedule').catch(console.warn)
     setOpponent('')
     setTime('')
     setLocation('')
@@ -195,6 +200,7 @@ function ScheduleSection() {
 
   function handleRemove(id) {
     setFixtures(removeFixture(id))
+    pushKey('sft_schedule').catch(console.warn)
   }
 
   const today = new Date().toISOString().split('T')[0]
@@ -295,6 +301,36 @@ function ScheduleSection() {
   )
 }
 
+function TeamIdSection() {
+  const config = getTeamConfig()
+  const shortId = config?.shortId
+  const [copied, setCopied] = useState(false)
+
+  if (!shortId || config?.teamId === 'local') return null
+
+  function handleCopy() {
+    navigator.clipboard.writeText(shortId).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <div className="card mb-4">
+      <h3 className="font-semibold mb-2 text-sm text-gray-600">☁️ Your Team ID</h3>
+      <p className="text-xs text-gray-500 mb-3">
+        Share this ID with anyone who needs to load your team data on a new device.
+      </p>
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xl font-bold tracking-widest text-blue-700">{shortId}</span>
+        <button onClick={handleCopy} className="btn btn-ghost btn-sm">
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function BackupSection() {
   const fileInputRef = useRef(null)
   const [importMsg, setImportMsg] = useState(null)
@@ -366,13 +402,23 @@ export default function AdminPage({ onBack }) {
 
   if (!unlocked) return <PinGate onUnlock={() => setUnlocked(true)} />
 
-  function handleAdd(name, type) { setRoster(addPlayer(name, type)) }
-  function handleToggle(id) { setRoster(updatePlayer(id, { active: !roster.find(p => p.id === id).active })) }
+  function handleAdd(name, type) {
+    setRoster(addPlayer(name, type))
+    pushKey('sft_roster').catch(console.warn)
+  }
+  function handleToggle(id) {
+    setRoster(updatePlayer(id, { active: !roster.find(p => p.id === id).active }))
+    pushKey('sft_roster').catch(console.warn)
+  }
   function handleRemove(id) {
     if (!confirm('Remove this player from the roster?')) return
     setRoster(removePlayer(id))
+    pushKey('sft_roster').catch(console.warn)
   }
-  function handleTypeToggle(id, type) { setRoster(updatePlayer(id, { type: type === 'BBH' ? 'SBH' : 'BBH' })) }
+  function handleTypeToggle(id, type) {
+    setRoster(updatePlayer(id, { type: type === 'BBH' ? 'SBH' : 'BBH' }))
+    pushKey('sft_roster').catch(console.warn)
+  }
 
   const bbh = roster.filter(p => p.type === 'BBH')
   const sbh = roster.filter(p => p.type === 'SBH')
@@ -422,6 +468,7 @@ export default function AdminPage({ onBack }) {
         {roster.filter(p => p.active).length} active · {roster.filter(p => !p.active).length} inactive
       </p>
 
+      <TeamIdSection />
       <ChangePinForm />
 
       <BackupSection />
