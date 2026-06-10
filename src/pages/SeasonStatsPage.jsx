@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Trophy, Calendar, Home, Trash2, BookOpen, X } from 'lucide-react'
-import { getGames, computeSeasonStats, deleteGame, getSeasonRecord } from '../storage'
+import { getGames, computeSeasonStats, computePlayerGameLog, deleteGame, getSeasonRecord } from '../storage'
 
 const STAT_TIPS = {
   G:    { label: 'Games',           desc: 'Number of games this player batted in.' },
@@ -65,12 +65,84 @@ function StatGuideSheet({ onClose }) {
   )
 }
 
+function PlayerDetailModal({ name, onClose }) {
+  const log = computePlayerGameLog(name)
+  const totals = log.reduce(
+    (acc, g) => ({ AB: acc.AB + g.AB, H: acc.H + g.H, HR: acc.HR + g.HR, RBI: acc.RBI + g.RBI, BB: acc.BB + g.BB, K: acc.K + g.K }),
+    { AB: 0, H: 0, HR: 0, RBI: 0, BB: 0, K: 0 }
+  )
+  const seasonAvg = totals.AB > 0 ? (totals.H / totals.AB).toFixed(3).replace(/^0/, '') : '.000'
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end z-50" onClick={onClose}>
+      <div className="bg-white rounded-t-2xl w-full p-4 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-base">{name}'s Stats</h3>
+          <button onClick={onClose} aria-label="Close" className="btn btn-ghost btn-sm p-1"><X size={18} /></button>
+        </div>
+
+        {/* Season totals bar */}
+        <div className="flex gap-4 bg-blue-50 rounded-lg p-3 mb-4 text-sm">
+          <div className="text-center"><p className="text-xs text-gray-500">G</p><p className="font-bold">{log.length}</p></div>
+          <div className="text-center"><p className="text-xs text-gray-500">AB</p><p className="font-bold">{totals.AB}</p></div>
+          <div className="text-center"><p className="text-xs text-gray-500">H</p><p className="font-bold">{totals.H}</p></div>
+          <div className="text-center"><p className="text-xs text-gray-500">HR</p><p className="font-bold">{totals.HR}</p></div>
+          <div className="text-center"><p className="text-xs text-gray-500">RBI</p><p className="font-bold">{totals.RBI}</p></div>
+          <div className="text-center"><p className="text-xs text-gray-500">AVG</p><p className="font-bold text-indigo-600">{seasonAvg}</p></div>
+        </div>
+
+        {/* Per-game table */}
+        {log.length === 0 ? (
+          <p className="text-gray-400 text-sm text-center py-4">No games recorded</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-500">
+                  <th className="text-left py-1 px-1">Date</th>
+                  <th className="text-left py-1 px-1">Game</th>
+                  <th className="text-center py-1 px-1">Res</th>
+                  <th className="text-center py-1 px-1">AB</th>
+                  <th className="text-center py-1 px-1">H</th>
+                  <th className="text-center py-1 px-1">HR</th>
+                  <th className="text-center py-1 px-1">RBI</th>
+                  <th className="text-center py-1 px-1">BB</th>
+                  <th className="text-center py-1 px-1">K</th>
+                  <th className="text-center py-1 px-1 text-indigo-500">AVG</th>
+                </tr>
+              </thead>
+              <tbody>
+                {log.map(g => (
+                  <tr key={g.gameId} className="border-b border-gray-100">
+                    <td className="py-1.5 px-1 whitespace-nowrap">{g.date}</td>
+                    <td className="py-1.5 px-1 text-gray-600 max-w-28 truncate">{g.matchup}</td>
+                    <td className={`py-1.5 px-1 text-center font-bold ${g.result === 'W' ? 'text-green-600' : g.result === 'L' ? 'text-red-500' : 'text-gray-500'}`}>{g.result}</td>
+                    <td className="py-1.5 px-1 text-center">{g.AB}</td>
+                    <td className="py-1.5 px-1 text-center">{g.H}</td>
+                    <td className="py-1.5 px-1 text-center">{g.HR || '—'}</td>
+                    <td className="py-1.5 px-1 text-center">{g.RBI}</td>
+                    <td className="py-1.5 px-1 text-center">{g.BB}</td>
+                    <td className="py-1.5 px-1 text-center">{g.K}</td>
+                    <td className="py-1.5 px-1 text-center text-indigo-600 font-medium">{g.AVG}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <button onClick={onClose} aria-label="Close" className="btn btn-primary btn-md w-full mt-4">Close</button>
+      </div>
+    </div>
+  )
+}
+
 export default function SeasonStatsPage({ onHome, onViewGame }) {
   const [games, setGames] = useState(getGames)
   const [activeTab, setActiveTab] = useState('batting')
   const [showGuide, setShowGuide] = useState(false)
   const [sortCol, setSortCol] = useState('AB')
   const [sortAsc, setSortAsc] = useState(false)
+  const [selectedPlayer, setSelectedPlayer] = useState(null)
 
   function handleSort(col) {
     if (sortCol === col) setSortAsc(a => !a)
@@ -167,7 +239,12 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 <tbody>
                   {stats.map(p => (
                     <tr key={p.name} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-1.5 px-1 font-medium whitespace-nowrap">{p.name}</td>
+                      <td
+                        className="py-1.5 px-1 font-medium whitespace-nowrap cursor-pointer text-blue-700 hover:underline"
+                        onClick={() => setSelectedPlayer(p.name)}
+                      >
+                        {p.name}
+                      </td>
                       {[p.G, p.R || 0, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
                         <td key={i} className="py-1.5 px-0.5 text-center">{v}</td>
                       ))}
@@ -245,6 +322,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
         }
       </div>
 
+      {selectedPlayer && <PlayerDetailModal name={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
       {showGuide && <StatGuideSheet onClose={() => setShowGuide(false)} />}
     </div>
   )
