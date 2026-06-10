@@ -353,13 +353,14 @@ function BackupSection() {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const data = JSON.parse(ev.target.result)
         if (!confirm(`This will overwrite your current roster, games, and league settings with the backup from ${data.exportedAt?.slice(0,10) || 'unknown date'}. Continue?`)) return
         importAllData(data)
-        // Push all imported keys to Supabase so cloud stays in sync
-        ;['sft_roster','sft_games','sft_division','sft_teams','sft_tournaments','sft_schedule'].forEach(k => pushKey(k).catch(console.warn))
+        setImportMsg({ ok: true, text: 'Syncing to cloud…' })
+        // Wait for all keys to push to Supabase before telling user to reload
+        await Promise.all(['sft_roster','sft_games','sft_division','sft_teams','sft_tournaments','sft_schedule'].map(k => pushKey(k).catch(console.warn)))
         setImportMsg({ ok: true, text: 'Restored successfully — reload to see changes' })
       } catch (err) {
         setImportMsg({ ok: false, text: err.message || 'Failed to read backup file' })
