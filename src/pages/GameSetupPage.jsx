@@ -4,6 +4,7 @@ import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestC
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft, getTeamConfig } from '../storage'
+import { pushKey } from '../sync'
 
 // Defined OUTSIDE GameSetupPage so React doesn't treat it as a new component
 // type on every render (which causes unmount/remount and scroll-to-top on iOS).
@@ -114,7 +115,7 @@ export default function GameSetupPage({ draftKey = 'default', onStart, onBack })
     if (!opponent.trim()) { setDetailsErr('Enter opponent team'); return }
     if (opponent.trim() === OUR_TEAM) { setDetailsErr(`Opponent can't also be ${OUR_TEAM || 'your team'}`); return }
     if (gameType === 'Tournament' && !tournamentName.trim()) { setDetailsErr('Enter a tournament name'); return }
-    if (gameType === 'Tournament') rememberTournament(tournamentName.trim())
+    if (gameType === 'Tournament') { rememberTournament(tournamentName.trim()); pushKey('sft_tournaments').catch(console.warn) }
     setDetailsErr(''); setDetailsOk(true)
   }
 
