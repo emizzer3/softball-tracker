@@ -7,8 +7,9 @@ import SummaryPage from './pages/SummaryPage'
 import SeasonStatsPage from './pages/SeasonStatsPage'
 import OnboardingPage from './pages/OnboardingPage'
 import CloudConnectPage from './pages/CloudConnectPage'
+import ViewerPage from './pages/ViewerPage'
 import { saveGame, getActiveGame, clearActiveGame, getSchedule, saveSetupDraft, getSetupDraft, getAllSetupDrafts, getTeamConfig, setTeamConfig, getDivision } from './storage'
-import { pushKey, pullAllData, flushQueue } from './sync'
+import { pushKey, pullAllData, flushQueue, loadViewerData } from './sync'
 import { Settings, Plus, BarChart2, CalendarDays, ChevronRight } from 'lucide-react'
 
 const P = { HOME: 'home', ADMIN: 'admin', SETUP: 'setup', TRACKER: 'tracker', SCORESHEET: 'scoresheet', SUMMARY: 'summary', SEASON: 'season' }
@@ -178,6 +179,46 @@ export default function App() {
   const [savedState, setSavedState] = useState(null)
   const [finishedGame, setFinishedGame] = useState(null)
   const [draftKey, setDraftKey] = useState('default')
+
+  // ── Viewer mode (?view=SHORT_ID) ───────────────────────────
+  const [viewerShortId] = useState(() => new URLSearchParams(window.location.search).get('view'))
+  const [viewerData, setViewerData] = useState(null)
+  const [viewerError, setViewerError] = useState(null)
+  const [viewerLoading, setViewerLoading] = useState(!!viewerShortId)
+
+  useEffect(() => {
+    if (!viewerShortId) return
+    loadViewerData(viewerShortId)
+      .then(d => { setViewerData(d); setViewerLoading(false) })
+      .catch(e => { setViewerError(e.message); setViewerLoading(false) })
+  }, [viewerShortId])
+
+  if (viewerShortId) {
+    if (viewerLoading) return (
+      <div className="max-w-lg mx-auto p-8 text-center text-gray-400 mt-16">
+        <p className="text-4xl mb-4">⚾</p>
+        <p className="font-semibold">Loading team…</p>
+      </div>
+    )
+    if (viewerError) return (
+      <div className="max-w-lg mx-auto p-8 text-center text-gray-400 mt-16">
+        <p className="text-4xl mb-4">😕</p>
+        <p className="font-semibold text-red-500">{viewerError}</p>
+        <p className="text-sm mt-2">Check the link and try again.</p>
+      </div>
+    )
+    if (viewerData) return (
+      <ViewerPage
+        data={viewerData}
+        onRefresh={() => {
+          setViewerLoading(true)
+          loadViewerData(viewerShortId)
+            .then(d => { setViewerData(d); setViewerLoading(false) })
+            .catch(e => { setViewerError(e.message); setViewerLoading(false) })
+        }}
+      />
+    )
+  }
 
   if (!onboarded) {
     return <OnboardingPage onComplete={() => setOnboarded(true)} />
