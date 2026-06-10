@@ -180,3 +180,35 @@ export async function createTeam({ name, division, pin }) {
   }
   throw new Error('Could not generate a unique Team ID — please try again.')
 }
+
+// ── Load team data for viewer mode (no PIN required) ──────────
+// Returns { teamName, sft_games, sft_roster, sft_schedule, ... }
+// Does NOT write to localStorage — ViewerPage uses this data directly.
+export async function loadViewerData(shortId) {
+  const client = getSupabase()
+  if (!client) throw new Error('Cloud sync not configured')
+
+  const { data: team, error: teamError } = await client
+    .from('teams')
+    .select('id, name, short_id')
+    .eq('short_id', shortId.trim().toUpperCase())
+    .single()
+  if (teamError || !team) throw new Error('Team not found — check the link.')
+
+  const { data: rows, error: dataError } = await client
+    .from('team_data')
+    .select('key, value')
+    .eq('team_id', team.id)
+  if (dataError) throw new Error('Failed to load team data.')
+
+  const reverseKeys = Object.fromEntries(
+    Object.entries(SYNC_KEYS).map(([localKey, remoteKey]) => [remoteKey, localKey])
+  )
+
+  const result = { teamName: team.name }
+  for (const row of (rows || [])) {
+    const localKey = reverseKeys[row.key]
+    if (localKey) result[localKey] = row.value
+  }
+  return result
+}
