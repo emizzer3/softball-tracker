@@ -141,12 +141,15 @@ function initAndMigrate() {
 
 export default function App() {
   const [onboarded, setOnboarded] = useState(initAndMigrate)
+  // Intentional: existing users who haven't set up cloud sync will see CloudConnectPage
+  // on their first load after this update. They can choose to connect or skip (local-only).
   const [cloudConnected, setCloudConnected] = useState(() => {
     return !!getTeamConfig()?.teamId
   })
 
   // Pull latest data from Supabase on mount (background, no reload).
-  // Keeps local cache fresh when the team uses multiple devices.
+  // Keeps local cache fresh across devices. Safe for Phase 2 because only one manager
+  // writes at a time — no concurrent-edit conflicts. Phase 3 adds a write queue.
   useEffect(() => {
     const teamId = getTeamConfig()?.teamId
     if (teamId && teamId !== 'local') {

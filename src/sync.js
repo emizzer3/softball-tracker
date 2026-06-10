@@ -87,7 +87,9 @@ export async function pushAllLocalData(teamId) {
 
 // ── Pull all team data from Supabase into localStorage ────────
 // Overwrites local keys unconditionally — no timestamp comparison.
-// Intended for initial device load only; do not use for background sync.
+// Phase 2: used both for initial load on a new device AND on-mount refresh in App.jsx.
+// Safe because this app has a single manager — concurrent multi-device edits are not a use case.
+// Phase 3 will add a write queue + last-write-wins before making sync bidirectional.
 export async function pullAllData(teamId) {
   if (!teamId || teamId === 'local') return
   const client = getSupabase()
