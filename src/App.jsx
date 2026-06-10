@@ -8,7 +8,7 @@ import SeasonStatsPage from './pages/SeasonStatsPage'
 import OnboardingPage from './pages/OnboardingPage'
 import CloudConnectPage from './pages/CloudConnectPage'
 import { saveGame, getActiveGame, clearActiveGame, getSchedule, saveSetupDraft, getSetupDraft, getAllSetupDrafts, getTeamConfig, setTeamConfig, getDivision } from './storage'
-import { pushKey, pullAllData } from './sync'
+import { pushKey, pullAllData, flushQueue } from './sync'
 import { Settings, Plus, BarChart2, CalendarDays, ChevronRight } from 'lucide-react'
 
 const P = { HOME: 'home', ADMIN: 'admin', SETUP: 'setup', TRACKER: 'tracker', SCORESHEET: 'scoresheet', SUMMARY: 'summary', SEASON: 'season' }
@@ -157,6 +157,22 @@ export default function App() {
     }
   }, [])
 
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
+
+  useEffect(() => {
+    function handleOnline() {
+      setIsOnline(true)
+      flushQueue().catch(console.warn)
+    }
+    function handleOffline() { setIsOnline(false) }
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
   const [page, setPage] = useState(P.HOME)
   const [currentSetup, setCurrentSetup] = useState(null)
   const [savedState, setSavedState] = useState(null)
@@ -258,6 +274,11 @@ export default function App() {
 
   return (
     <>
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-xs text-center py-1 font-semibold">
+          Offline — changes will sync when reconnected
+        </div>
+      )}
       {page === P.HOME       && <HomePage onNav={handleNav} onFixtureClick={handleFixtureSetup} />}
       {page === P.ADMIN      && <AdminPage onBack={() => setPage(P.HOME)} />}
       {page === P.SETUP      && <GameSetupPage draftKey={draftKey} onStart={handleGameStart} onBack={() => setPage(P.HOME)} />}
