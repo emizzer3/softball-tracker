@@ -154,6 +154,12 @@ export default function App() {
     }
   }, [])
 
+  const [page, setPage] = useState(P.HOME)
+  const [currentSetup, setCurrentSetup] = useState(null)
+  const [savedState, setSavedState] = useState(null)
+  const [finishedGame, setFinishedGame] = useState(null)
+  const [draftKey, setDraftKey] = useState('default')
+
   if (!onboarded) {
     return <OnboardingPage onComplete={() => setOnboarded(true)} />
   }
@@ -161,12 +167,6 @@ export default function App() {
   if (!cloudConnected) {
     return <CloudConnectPage onComplete={() => setCloudConnected(true)} />
   }
-
-  const [page, setPage] = useState(P.HOME)
-  const [currentSetup, setCurrentSetup] = useState(null)
-  const [savedState, setSavedState] = useState(null)
-  const [finishedGame, setFinishedGame] = useState(null)
-  const [draftKey, setDraftKey] = useState('default')
 
   function handleNav(p, data) {
     if (p === P.TRACKER && data?.setup) {
