@@ -177,8 +177,8 @@ export function importAllData(data) {
 }
 
 // ── Season stats (derived, not stored — computed from games) ──
-export function computeSeasonStats() {
-  const games = getGames()
+export function computeSeasonStats(gamesInput) {
+  const games = gamesInput || getGames()
   const stats = {}
 
   function ensure(name) {
@@ -246,8 +246,8 @@ export function computeSeasonStats() {
 }
 
 // ── Per-player game log (for drill-down in SeasonStatsPage) ───────────────
-export function computePlayerGameLog(playerName) {
-  const games = getGames()
+export function computePlayerGameLog(playerName, gamesInput) {
+  const games = gamesInput || getGames()
   const rows = []
 
   for (const game of games) {
@@ -277,8 +277,8 @@ export function computePlayerGameLog(playerName) {
 }
 
 // ── Team runs per game (for trend chart in SeasonStatsPage) ──────────────
-export function computeRunsPerGame() {
-  return getGames()
+export function computeRunsPerGame(gamesInput) {
+  return (gamesInput || getGames())
     .filter(g => g.date)
     .map(g => {
       const weAreHome = g.setup?.weAreHome !== false
