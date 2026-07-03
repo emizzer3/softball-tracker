@@ -721,11 +721,20 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
             </button>
           </div>
           <p className="text-xs text-gray-400 text-center">3 outs ends the half-inning · use outcome buttons below for detail</p>
+          <div className="flex items-center gap-2 my-2">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-[10px] text-gray-400 uppercase tracking-wide">or runner out — batter stays up</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
           <button
             onClick={() => { setRunnerOutMode('fielding'); setShowRunnerOut(true) }}
-            className="btn btn-ghost btn-sm w-full mt-1 text-xs text-slate-500 border border-slate-200 gap-1"
+            className="btn btn-sm w-full flex items-center justify-center gap-2 bg-violet-50 border border-violet-300 text-violet-700 hover:bg-violet-100"
           >
-            ⚡ CS / Picked Off — record fielder PO
+            <span className="text-base">⚡</span>
+            <div className="text-left">
+              <div className="font-semibold text-sm">CS / Picked Off</div>
+              <div className="text-[10px] opacity-70">caught stealing or pickoff · records fielder PO</div>
+            </div>
           </button>
         </div>
       )}
