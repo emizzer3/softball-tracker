@@ -295,6 +295,11 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       // Putout modal only when WE are fielding — credit our fielder.
       setPendingOutCode(code)
       setShowPutout(true)
+    } else if (code === 'SAC' && !isOurBatting) {
+      // Need to capture who caught the fly ball for PO credit.
+      // Opponent runs scored separately via recordOpponentRun, so pendingSacRuns stays 0.
+      setPendingOutCode('SAC')
+      setShowPutout(true)
     } else {
       setLastAction({ code, batter, rbi: 0, fielder: null, assister: null, autoFielder: null })
       finishOutcome(code)
