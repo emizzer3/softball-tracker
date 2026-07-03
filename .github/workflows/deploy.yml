@@ -45,3 +45,12 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/deploy-pages@v4
         id: deployment
+        # GitHub Pages infra is occasionally flaky; retry up to 3 times before failing
+      - name: Retry deploy on failure
+        if: failure() && steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        id: deployment_retry1
+      - name: Retry deploy (attempt 3)
+        if: failure() && steps.deployment_retry1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        id: deployment_retry2
