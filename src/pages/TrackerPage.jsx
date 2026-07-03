@@ -91,6 +91,8 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   const [pendingHitLoc, setPendingHitLoc] = useState(null)
   const [showSacRuns, setShowSacRuns] = useState(false)
   const [pendingSacLoc, setPendingSacLoc] = useState(null)
+  const [showRunnerOut, setShowRunnerOut] = useState(false)
+  const [runnerOutMode, setRunnerOutMode] = useState('batting') // 'batting' | 'fielding'
 
   // weAreHome defaults true for any games saved before this field existed
   const weAreHome = setup.weAreHome !== false
@@ -436,6 +438,62 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     persist(g)
   }
 
+  function recordBattingRunnerOut() {
+    const g = { ...gs, balls: 0, strikes: 0 }
+    g.playLog = [...g.playLog, { type: 'runnerOut', inning: g.inning, half: g.half }]
+    g.outs++
+    if (g.outs >= 3) {
+      g.bases = [false, false, false]
+      g.outs = 0
+      if (g.half === 'top') {
+        if (g.inning >= setup.innings && g.homeScore > g.awayScore) {
+          g.done = true
+        } else {
+          g.half = 'bottom'
+        }
+      } else {
+        if (g.inning >= setup.innings) {
+          g.done = true
+        } else {
+          g.inning++
+          g.half = 'top'
+        }
+      }
+    }
+    persist(g)
+  }
+
+  function recordFieldingRunnerOut(fielder, assister) {
+    const g = { ...gs, balls: 0, strikes: 0 }
+    g.playLog = [...g.playLog, {
+      type: 'runnerOut',
+      fielder:  fielder  || null,
+      assister: assister || null,
+      inning: g.inning,
+      half: g.half,
+    }]
+    g.outs++
+    if (g.outs >= 3) {
+      g.bases = [false, false, false]
+      g.outs = 0
+      if (weAreHome) {
+        if (g.inning >= setup.innings && g.homeScore > g.awayScore) {
+          g.done = true
+        } else {
+          g.half = 'bottom'
+        }
+      } else {
+        if (g.inning >= setup.innings) {
+          g.done = true
+        } else {
+          g.inning++
+          g.half = 'top'
+        }
+      }
+    }
+    persist(g)
+  }
+
   function updateLastAtBatRbi(delta) {
     if (gs.atBats.length === 0) return
     const newAtBats = [...gs.atBats]
@@ -588,6 +646,13 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
             >
               <span>🏃</span> +1 Run
             </button>
+            <button
+              onClick={() => { setRunnerOutMode('batting'); setShowRunnerOut(true) }}
+              className="btn btn-sm bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 w-full gap-1 mt-1"
+              title="Record a baserunning out (caught stealing, picked off) without ending this at-bat"
+            >
+              <span>⚡</span> Runner Out
+            </button>
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -630,6 +695,12 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
             </button>
           </div>
           <p className="text-xs text-gray-400 text-center">3 outs ends the half-inning · use outcome buttons below for detail</p>
+          <button
+            onClick={() => { setRunnerOutMode('fielding'); setShowRunnerOut(true) }}
+            className="btn btn-ghost btn-sm w-full mt-1 text-xs text-slate-500 border border-slate-200 gap-1"
+          >
+            ⚡ CS / Picked Off — record fielder PO
+          </button>
         </div>
       )}
 
@@ -818,6 +889,24 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
         />
       )}
 
+      {/* Runner-out modal (caught stealing / picked off) */}
+      {showRunnerOut && (
+        <RunnerOutModal
+          mode={runnerOutMode}
+          battingOrder={battingOrder}
+          playerPositions={setup.playerPositions}
+          onConfirm={(fielder, assister) => {
+            setShowRunnerOut(false)
+            if (runnerOutMode === 'batting') {
+              recordBattingRunnerOut()
+            } else {
+              recordFieldingRunnerOut(fielder, assister)
+            }
+          }}
+          onCancel={() => setShowRunnerOut(false)}
+        />
+      )}
+
       {/* Outcome guide sheet */}
       {showGuide && (
         <OutcomeGuideSheet onClose={() => setShowGuide(false)} />
@@ -924,6 +1013,96 @@ function SacRunsModal({ batter, bases, onConfirm }) {
           ))}
         </div>
         <p className="text-xs text-gray-400 text-center">Batter is out either way — this just records the RBIs.</p>
+      </div>
+    </div>
+  )
+}
+
+function RunnerOutModal({ mode, battingOrder, playerPositions, onConfirm, onCancel }) {
+  const [fielder,  setFielder]  = useState('')
+  const [assister, setAssister] = useState('')
+
+  const players = battingOrder.map(name => ({
+    name,
+    pos: playerPositions?.[name] || '?',
+  }))
+
+  if (mode === 'batting') {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+        <div className="bg-white rounded-t-2xl w-full p-4">
+          <h3 className="font-bold mb-1">⚡ Runner Out</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Record a baserunning out (caught stealing, picked off). This adds 1 out without changing the current batter.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={onCancel} className="btn btn-ghost btn-md flex-1">Cancel</button>
+            <button onClick={() => onConfirm(null, null)} className="btn btn-danger btn-md flex-1">
+              ✓ Record Out
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+      <div className="bg-white rounded-t-2xl w-full p-4 max-h-[85vh] overflow-y-auto">
+        <h3 className="font-bold mb-1">⚡ CS / Picked Off</h3>
+        <p className="text-xs text-gray-500 mb-3">
+          Their runner was thrown out. Tap who made the tag/catch (PO) and who threw it (A). Skip if unsure.
+        </p>
+
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Who got the out?</span>
+            <span className="text-xs bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded">PO</span>
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {players.map(({ name, pos }) => (
+              <button
+                key={name}
+                onClick={() => { setFielder(name); if (assister === name) setAssister('') }}
+                className={`btn btn-sm flex flex-col h-auto py-1.5 gap-0 ${fielder === name ? 'btn-primary' : 'btn-ghost'}`}
+              >
+                <span className="text-xs font-black leading-tight">{pos}</span>
+                <span className="text-xs leading-tight">{name.split(' ')[0]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {fielder && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Who threw it? (optional)</span>
+              <span className="text-xs bg-amber-100 text-amber-600 font-semibold px-1.5 py-0.5 rounded">A</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {players.filter(p => p.name !== fielder).map(({ name, pos }) => (
+                <button
+                  key={name}
+                  onClick={() => setAssister(prev => prev === name ? '' : name)}
+                  className={`btn btn-sm flex flex-col h-auto py-1.5 gap-0 ${assister === name ? 'btn-warning' : 'btn-ghost'}`}
+                >
+                  <span className="text-xs font-black leading-tight">{pos}</span>
+                  <span className="text-xs leading-tight">{name.split(' ')[0]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-2">
+          <button onClick={onCancel} className="btn btn-ghost btn-md flex-1">Cancel</button>
+          <button
+            onClick={() => onConfirm(fielder || null, assister || null)}
+            className="btn btn-danger btn-md flex-1"
+          >
+            ✓ Record Out
+          </button>
+        </div>
       </div>
     </div>
   )

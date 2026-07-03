@@ -225,7 +225,7 @@ export function computeSeasonStats(gamesInput) {
     for (const play of (game.playLog || [])) {
       if (play.type === 'run'    && play.player)   ensure(play.player).R++
       if (play.type === 'error'  && play.fielder)  ensure(play.fielder).E++
-      if (play.type === 'putout') {
+      if (play.type === 'putout' || play.type === 'runnerOut') {
         if (play.fielder)  ensure(play.fielder).PO++
         if (play.assister) ensure(play.assister).A++
       }

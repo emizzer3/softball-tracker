@@ -144,3 +144,41 @@ describe('computeSeasonStats — rate fields', () => {
     expect(stats).toHaveLength(0)
   })
 })
+
+describe('computeSeasonStats — runnerOut play type', () => {
+  it('credits PO to fielder on runnerOut event', () => {
+    saveGame({
+      id: 'g1', date: '2024-05-01', gameType: 'League',
+      home: 'Home', away: 'Away', homeScore: 5, awayScore: 3, result: 'W',
+      atBats: [
+        { id: 'ab1', batter: 'Alice', inning: 1, half: 'bottom', outcome: '1B', rbi: 0 },
+      ],
+      playLog: [
+        { type: 'runnerOut', fielder: 'Dave', assister: 'Eve', inning: 1, half: 'top' },
+      ],
+    })
+    const stats = computeSeasonStats()
+    const dave = stats.find(p => p.name === 'Dave')
+    const eve  = stats.find(p => p.name === 'Eve')
+    expect(dave).toBeDefined()
+    expect(dave.PO).toBe(1)
+    expect(eve).toBeDefined()
+    expect(eve.A).toBe(1)
+  })
+
+  it('handles runnerOut with no fielder (batting-half version)', () => {
+    saveGame({
+      id: 'g1', date: '2024-05-01', gameType: 'League',
+      home: 'Home', away: 'Away', homeScore: 5, awayScore: 3, result: 'W',
+      atBats: [
+        { id: 'ab1', batter: 'Alice', inning: 1, half: 'bottom', outcome: '1B', rbi: 0 },
+      ],
+      playLog: [
+        { type: 'runnerOut', inning: 2, half: 'bottom' },
+      ],
+    })
+    const stats = computeSeasonStats()
+    // No fielder — no PO credited, no crash
+    expect(stats.find(p => p.name === 'Alice')).toBeDefined()
+  })
+})
