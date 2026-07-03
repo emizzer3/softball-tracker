@@ -335,16 +335,9 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
 
   function confirmSacRuns(n) {
     setShowSacRuns(false)
-    if (!isOurBatting) {
-      // We're fielding — need to know who caught the fly ball (PO for the catcher)
-      setPendingSacRuns(n)
-      setPendingOutCode('SAC')
-      setShowPutout(true)
-    } else {
-      setLastAction({ code: 'SAC', batter, rbi: n, fielder: null, assister: null, autoFielder: null })
-      finishOutcome('SAC', [], pendingSacLoc, n)
-      setPendingSacLoc(null)
-    }
+    setLastAction({ code: 'SAC', batter, rbi: n, fielder: null, assister: null, autoFielder: null })
+    finishOutcome('SAC', [], pendingSacLoc, n)
+    setPendingSacLoc(null)
   }
 
   function completePutout(fielder, assister, doublePlay = false, triplePlay = false, fielder2 = null, assister2 = null) {
