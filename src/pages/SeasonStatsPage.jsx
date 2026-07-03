@@ -630,15 +630,16 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 totalOuts += outs[t]
               }
 
-              return { name: p.name, seasonAvg, last3Avg, delta, streak, avgByGame, improving, outs, totalOuts, G: log.length, AB: p.AB }
+              const outsPerGame = log.length > 0 ? totalOuts / log.length : 0
+              return { name: p.name, seasonAvg, last3Avg, delta, streak, avgByGame, improving, outs, totalOuts, outsPerGame, G: log.length, AB: p.AB }
             })
 
             const hotPlayers = insights.filter(p => p.streak === 'hot').sort((a, b) => b.delta - a.delta)
             const coldPlayers = insights.filter(p => p.streak === 'cold').sort((a, b) => a.delta - b.delta)
             const improving = insights.filter(p => p.improving !== null && p.improving > 0.030).sort((a, b) => b.improving - a.improving)
             const declining = insights.filter(p => p.improving !== null && p.improving < -0.030).sort((a, b) => a.improving - b.improving)
-            const playersWithOuts = insights.filter(p => p.totalOuts > 0).sort((a, b) => b.totalOuts - a.totalOuts)
-            const maxOuts = Math.max(...playersWithOuts.map(p => p.totalOuts), 1)
+            const playersWithOuts = insights.filter(p => p.totalOuts > 0).sort((a, b) => b.outsPerGame - a.outsPerGame)
+            const maxOuts = Math.max(...playersWithOuts.map(p => p.outsPerGame), 1)
 
             // Headlines
             const mostKs = playersWithOuts.length > 0 ? [...playersWithOuts].sort((a, b) => b.outs.K - a.outs.K)[0] : null
@@ -778,12 +779,12 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                     {/* Visual bars per player */}
                     <div className="space-y-2">
                       {playersWithOuts.map(p => {
-                        const barW = (p.totalOuts / maxOuts) * 100
+                        const barW = (p.outsPerGame / maxOuts) * 100
                         return (
                           <div key={p.name}>
                             <div className="flex items-center justify-between mb-0.5">
                               <span className="text-xs font-semibold text-gray-700 truncate">{p.name}</span>
-                              <span className="text-[10px] text-gray-400">{p.totalOuts} out{p.totalOuts !== 1 ? 's' : ''}</span>
+                              <span className="text-[10px] text-gray-400">{p.outsPerGame.toFixed(1)}/game ({p.totalOuts} total)</span>
                             </div>
                             <div className="flex h-4 rounded-sm overflow-hidden bg-gray-100" style={{ width: `${Math.max(barW, 15)}%` }}>
                               {OUT_TYPES.map(t => {
