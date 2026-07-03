@@ -16,6 +16,8 @@ const STAT_TIPS = {
   AVG:  { label: 'Batting Average', desc: 'Hits ÷ At Bats. A .300 average means getting a hit 30% of the time. League average is typically .250.' },
   OBP:  { label: 'On-Base %',       desc: 'Hits + Walks ÷ (At Bats + Walks). How often the batter gets on base. .350+ is great.' },
   SLG:  { label: 'Slugging %',      desc: 'Total bases ÷ At Bats. Measures hitting power. A single = 1 base, double = 2, triple = 3, HR = 4.' },
+  KPct:  { label: 'K%',    desc: 'Strikeout rate — Ks per at-bat as a percentage. Lower is better.' },
+  BBPct: { label: 'BB%',   desc: 'Walk rate — walks per plate appearance (AB + BB) as a percentage. Higher is better.' },
   PO:   { label: 'Putouts',         desc: 'Outs the fielder directly recorded — catching a fly ball, tagging a runner, or receiving a throw at base.' },
   A:    { label: 'Assists',         desc: 'Times the fielder threw the ball to help get a runner out.' },
   E:    { label: 'Errors',          desc: 'Times the fielder made a mistake that let a batter or runner advance when they should have been out.' },
@@ -33,7 +35,7 @@ function StatGuideSheet({ onClose }) {
           <div>
             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1.5">Batting</p>
             <div className="space-y-2">
-              {['G','R','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG'].map(k => (
+              {['G','R','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG','KPct','BBPct'].map(k => (
                 <div key={k} className="flex gap-3 items-start">
                   <span className="shrink-0 w-10 text-center font-black text-xs bg-gray-100 text-gray-700 px-1 py-0.5 rounded">{k}</span>
                   <div>
@@ -354,6 +356,43 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )
+              })()}
+
+              {/* Fielding stats sub-table */}
+              {(() => {
+                const fieldingPlayers = stats.filter(p => p.PO + p.A + p.E > 0)
+                if (fieldingPlayers.length === 0) return null
+                return (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Fielding</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-200 text-gray-500">
+                            {['Player','G','PO','PO/G','A','A/G','E','E/G'].map(h => (
+                              <th key={h} className={`py-1 font-semibold whitespace-nowrap ${h === 'Player' ? 'text-left px-1' : 'text-center px-0.5'}`}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fieldingPlayers.map(p => (
+                            <tr key={p.name} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="py-1.5 px-1 font-medium whitespace-nowrap">{p.name}</td>
+                              <td className="py-1.5 px-0.5 text-center">{p.G}</td>
+                              <td className="py-1.5 px-0.5 text-center">{p.PO}</td>
+                              <td className="py-1.5 px-0.5 text-center text-indigo-500">{p.POPerG}</td>
+                              <td className="py-1.5 px-0.5 text-center">{p.A}</td>
+                              <td className="py-1.5 px-0.5 text-center text-indigo-500">{p.APerG}</td>
+                              <td className="py-1.5 px-0.5 text-center">{p.E}</td>
+                              <td className={`py-1.5 px-0.5 text-center font-medium ${p.E > 0 ? 'text-amber-600' : 'text-gray-400'}`}>{p.EPerG}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">PO/G · A/G · E/G = per game averages</p>
                   </div>
                 )
               })()}

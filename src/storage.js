@@ -235,12 +235,19 @@ export function computeSeasonStats(gamesInput) {
   return Object.values(stats).map(s => {
     const singles = s.H - s['2B'] - s['3B'] - s.HR
     const tb = singles + s['2B'] * 2 + s['3B'] * 3 + s.HR * 4
+    const gCount = s.G.size
+    const pa = s.AB + s.BB   // plate appearances (for BBPct denominator)
     return {
       ...s,
-      G: s.G.size,
-      AVG: s.AB > 0 ? (s.H / s.AB).toFixed(3).replace(/^0/, '') : '.000',
-      OBP: (s.AB + s.BB) > 0 ? ((s.H + s.BB) / (s.AB + s.BB)).toFixed(3).replace(/^0/, '') : '.000',
-      SLG: s.AB > 0 ? (tb / s.AB).toFixed(3).replace(/^0/, '') : '.000',
+      G:      gCount,
+      AVG:    s.AB > 0 ? (s.H / s.AB).toFixed(3).replace(/^0/, '') : '.000',
+      OBP:    (s.AB + s.BB) > 0 ? ((s.H + s.BB) / (s.AB + s.BB)).toFixed(3).replace(/^0/, '') : '.000',
+      SLG:    s.AB > 0 ? (tb / s.AB).toFixed(3).replace(/^0/, '') : '.000',
+      KPct:   s.AB > 0 ? (s.K  / s.AB * 100).toFixed(1) : '0.0',
+      BBPct:  pa       > 0 ? (s.BB / pa    * 100).toFixed(1) : '0.0',
+      POPerG: gCount   > 0 ? (s.PO / gCount).toFixed(1) : '0.0',
+      APerG:  gCount   > 0 ? (s.A  / gCount).toFixed(1) : '0.0',
+      EPerG:  gCount   > 0 ? (s.E  / gCount).toFixed(1) : '0.0',
     }
   }).sort((a, b) => b.AB - a.AB)
 }
