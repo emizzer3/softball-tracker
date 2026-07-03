@@ -364,8 +364,8 @@ export default function ScoresheetPage({ game, onHome, onSummary }) {
       {game.fieldingLineup && Object.keys(game.fieldingLineup).length > 0 && (() => {
         const playLog = game.playLog || []
         const hasStats = battingOrder.some(name => {
-          const po = playLog.filter(l => l.type === 'putout' && l.fielder === name).length
-          const a  = playLog.filter(l => l.type === 'putout' && l.assister === name).length
+          const po = playLog.filter(l => (l.type === 'putout' || l.type === 'runnerOut') && l.fielder === name).length
+          const a  = playLog.filter(l => (l.type === 'putout' || l.type === 'runnerOut') && l.assister === name).length
           const e  = playLog.filter(l => l.type === 'error'  && l.fielder === name).length
           return po + a + e > 0
         })
@@ -408,8 +408,8 @@ export default function ScoresheetPage({ game, onHome, onSummary }) {
                     </thead>
                     <tbody>
                       {battingOrder.map(name => {
-                        const po = playLog.filter(l => l.type === 'putout' && l.fielder === name).length
-                        const a  = playLog.filter(l => l.type === 'putout' && l.assister === name).length
+                        const po = playLog.filter(l => (l.type === 'putout' || l.type === 'runnerOut') && l.fielder === name).length
+                        const a  = playLog.filter(l => (l.type === 'putout' || l.type === 'runnerOut') && l.assister === name).length
                         const e  = playLog.filter(l => l.type === 'error'  && l.fielder === name).length
                         if (po + a + e === 0) return null
                         const pos = game.playerPositions?.[name] || ''

@@ -49,8 +49,8 @@ export default function SummaryPage({ game, onHome }) {
 
   // Per-player fielding stats
   const fieldingStats = battingOrder.map(name => {
-    const PO = playLog.filter(l => l.type === 'putout' && l.fielder  === name).length
-    const A  = playLog.filter(l => l.type === 'putout' && l.assister === name).length
+    const PO = playLog.filter(l => (l.type === 'putout' || l.type === 'runnerOut') && l.fielder  === name).length
+    const A  = playLog.filter(l => (l.type === 'putout' || l.type === 'runnerOut') && l.assister === name).length
     const E  = playLog.filter(l => l.type === 'error'  && l.fielder  === name).length
     const pos = playerPositions[name] || ''
     return { name, pos, PO, A, E }
