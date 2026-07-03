@@ -436,6 +436,17 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     persist(g)
   }
 
+  function updateLastAtBatRbi(delta) {
+    if (gs.atBats.length === 0) return
+    const newAtBats = [...gs.atBats]
+    const last = newAtBats[newAtBats.length - 1]
+    const newRbi = Math.max(0, (last.rbi || 0) + delta)
+    newAtBats[newAtBats.length - 1] = { ...last, rbi: newRbi }
+    const newGs = { ...gs, atBats: newAtBats }
+    setLastAction(prev => prev ? { ...prev, rbi: newRbi } : prev)
+    persist(newGs)
+  }
+
   function toggleBase(i) {
     const g = { ...gs }
     const newBases = [...g.bases]
@@ -738,7 +749,15 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
         </div>
       )}
 
-      {lastAction && <LastPlayCard action={lastAction} atBats={gs.atBats} playLog={gs.playLog} onUndo={undo} />}
+      {lastAction && (
+        <LastPlayCard
+          action={lastAction}
+          atBats={gs.atBats}
+          playLog={gs.playLog}
+          onUndo={undo}
+          onEditRbi={isOurBatting ? updateLastAtBatRbi : null}
+        />
+      )}
 
       {/* Error logging — only meaningful when WE are fielding */}
       {!isOurBatting && (
@@ -1050,7 +1069,7 @@ const OUTCOME_META = {
   'SAC': { label: 'Sacrifice',        bg: 'bg-gray-50',   border: 'border-gray-300',  text: 'text-gray-600'  },
 }
 
-function LastPlayCard({ action, atBats, playLog, onUndo }) {
+function LastPlayCard({ action, atBats, playLog, onUndo, onEditRbi = null }) {
   const [expanded, setExpanded] = useState(false)
   const meta = OUTCOME_META[action.code] || { label: action.code, bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' }
   const isOut = ['K','F','G','FC','SAC'].includes(action.code)
@@ -1072,9 +1091,23 @@ function LastPlayCard({ action, atBats, playLog, onUndo }) {
             <span className={`font-black text-lg ${meta.text}`}>{action.code}</span>
             <span className="text-sm font-semibold text-gray-700">{action.batter}</span>
             <span className="text-xs text-gray-500">{meta.label}</span>
-            {action.rbi > 0 && (
-              <span className="text-xs bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">
+            {(action.rbi > 0 || onEditRbi) && (
+              <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">
                 {action.rbi} RBI
+                {onEditRbi && (
+                  <>
+                    <button
+                      onClick={() => onEditRbi(-1)}
+                      className="text-amber-500 hover:text-amber-800 font-black leading-none px-0.5"
+                      title="Decrease RBI"
+                    >−</button>
+                    <button
+                      onClick={() => onEditRbi(+1)}
+                      className="text-amber-500 hover:text-amber-800 font-black leading-none px-0.5"
+                      title="Increase RBI"
+                    >+</button>
+                  </>
+                )}
               </span>
             )}
           </div>
