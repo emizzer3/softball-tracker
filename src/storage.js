@@ -200,6 +200,7 @@ export function computeSeasonStats(gamesInput) {
     const playersThisGame = new Set()
 
     for (const ab of (game.atBats || [])) {
+      if (ab.isOpponent) continue
       const s = ensure(ab.batter)
       s.G.add(game.id)
       playersThisGame.add(ab.batter)

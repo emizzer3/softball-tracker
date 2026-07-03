@@ -406,7 +406,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
             const battingByGame = sortedGames
               .filter(g => g.atBats?.length > 0)
               .map(g => {
-                const abs = g.atBats || []
+                const abs = (g.atBats || []).filter(ab => !ab.isOpponent)
                 const singles = abs.filter(ab => ab.outcome === '1B').length
                 const doubles = abs.filter(ab => ab.outcome === '2B').length
                 const triples = abs.filter(ab => ab.outcome === '3B').length
@@ -416,17 +416,17 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
 
             // Spray chart data: collect all hit dots across all games (include batter for interactivity)
             const allDots = sortedGames.flatMap(g =>
-              (g.atBats || []).filter(ab => ab.hitLocation).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter }))
+              (g.atBats || []).filter(ab => ab.hitLocation && !ab.isOpponent).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter }))
             )
             const sprayBatters = [...new Set(allDots.map(d => d.batter).filter(Boolean))]
             const perGameSpray = sortedGames
-              .filter(g => (g.atBats || []).some(ab => ab.hitLocation))
+              .filter(g => (g.atBats || []).some(ab => ab.hitLocation && !ab.isOpponent))
               .map(g => ({
                 gameId: g.id,
                 date: g.date,
                 opponent: g.setup?.weAreHome !== false ? g.away : g.home,
                 result: g.result,
-                dots: (g.atBats || []).filter(ab => ab.hitLocation).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter })),
+                dots: (g.atBats || []).filter(ab => ab.hitLocation && !ab.isOpponent).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter })),
               }))
 
             const maxRuns = runs.length > 0 ? Math.max(...runs.map(g => Math.max(g.ourRuns, g.theirRuns)), 1) : 1

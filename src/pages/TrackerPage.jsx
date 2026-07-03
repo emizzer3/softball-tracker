@@ -211,15 +211,17 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       else if (!isOut) newBases[by - 1] = true    // batter stops on base (not for outs)
     }
 
+    const opponentName = weAreHome ? setup.away : setup.home
     const atBat = {
       id: Date.now(),
-      batter,
+      batter: isOurBatting ? batter : opponentName,
       inning: g.inning,
       half: g.half,
       outcome: code,
       rbi: runs,
       bases: [...newBases],
       hitLocation: hitLocation || null,
+      ...(isOurBatting ? {} : { isOpponent: true }),
     }
     g.atBats = [...g.atBats, atBat]
 
@@ -270,7 +272,10 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     }
 
     g.bases = newBases
-    g.batterIndex = g.done ? g.batterIndex : (g.batterIndex + 1) % battingOrder.length
+    // Only advance our batting order when WE are batting — opponent at-bats must not skip our lineup
+    if (isOurBatting) {
+      g.batterIndex = g.done ? g.batterIndex : (g.batterIndex + 1) % battingOrder.length
+    }
 
     setLastAction(prev => ({ ...prev, code, batter, rbi: runs }))
     persist(g)
