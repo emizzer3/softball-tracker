@@ -801,6 +801,16 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                                 )
                               })}
                             </div>
+                            <div className="flex flex-wrap gap-x-2 mt-0.5">
+                              {OUT_TYPES.filter(t => p.outs[t] > 0).map(t => {
+                                const pct = Math.round((p.outs[t] / p.totalOuts) * 100)
+                                return (
+                                  <span key={t} className="text-[9px] font-medium" style={{ color: OUT_COLORS[t] }}>
+                                    {t} {pct}%
+                                  </span>
+                                )
+                              })}
+                            </div>
                           </div>
                         )
                       })}
