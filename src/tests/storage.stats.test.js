@@ -145,6 +145,32 @@ describe('computeSeasonStats — rate fields', () => {
   })
 })
 
+describe('computeSeasonStats — double play fielding', () => {
+  it('credits PO to both putout entries when DP logs two putout events', () => {
+    saveGame({
+      id: 'g1', date: '2024-05-01', gameType: 'League',
+      home: 'Home', away: 'Away', homeScore: 5, awayScore: 3, result: 'W',
+      atBats: [
+        { id: 'ab1', batter: 'Opp1', inning: 1, half: 'top', outcome: 'G', rbi: 0 },
+      ],
+      playLog: [
+        // First out: 1B (3) fields, throws to 2B (4) who gets PO on runner
+        { type: 'putout', fielder: 'Alice', assister: 'Bob', inning: 1, half: 'top', outCode: 'G', batter: 'Opp1', doublePlay: true },
+        // Second out: batter thrown out at first — 2B (4) threw to 1B (3)
+        { type: 'putout', fielder: 'Carol', assister: 'Alice', inning: 1, half: 'top', outCode: 'G', batter: null },
+      ],
+    })
+    const stats = computeSeasonStats()
+    const alice = stats.find(p => p.name === 'Alice')
+    const bob   = stats.find(p => p.name === 'Bob')
+    const carol = stats.find(p => p.name === 'Carol')
+    expect(alice.PO).toBe(1)  // first putout
+    expect(alice.A).toBe(1)   // assist on second putout
+    expect(bob.A).toBe(1)     // assist on first putout
+    expect(carol.PO).toBe(1)  // second putout
+  })
+})
+
 describe('computeSeasonStats — runnerOut play type', () => {
   it('credits PO to fielder on runnerOut event', () => {
     saveGame({
