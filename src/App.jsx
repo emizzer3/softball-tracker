@@ -144,8 +144,10 @@ export default function App() {
   const [onboarded, setOnboarded] = useState(initAndMigrate)
   // Intentional: existing users who haven't set up cloud sync will see CloudConnectPage
   // on their first load after this update. They can choose to connect or skip (local-only).
+  // Skipped entirely when a game is already in progress — reloading mid-game (e.g. iOS
+  // backgrounding the tab) must resume straight into the game, not an onboarding screen.
   const [cloudConnected, setCloudConnected] = useState(() => {
-    return !!getTeamConfig()?.teamId
+    return !!getTeamConfig()?.teamId || !!getActiveGame()
   })
 
   // Pull latest data from Supabase on mount (background, no reload).

@@ -172,6 +172,23 @@ export default function GameSetupPage({ draftKey = 'default', onStart, onBack })
     setOrderErr(''); setOrderOk(true)
   }
 
+  // Interleaves the current order into BBH/SBH/BBH/SBH… (or SBH-first if there
+  // are more SBH players), preserving each group's relative order. Doesn't
+  // require manual drag-and-drop when players were selected grouped by type.
+  function autoArrangeOrder() {
+    const bbhNames = order.filter(n => rosterMap[n] === 'BBH')
+    const sbhNames = order.filter(n => rosterMap[n] === 'SBH')
+    const [first, second] = bbhNames.length >= sbhNames.length ? [bbhNames, sbhNames] : [sbhNames, bbhNames]
+    const arranged = []
+    for (let i = 0; i < Math.max(first.length, second.length); i++) {
+      if (first[i]) arranged.push(first[i])
+      if (second[i]) arranged.push(second[i])
+    }
+    setOrder(arranged)
+    setOrderErr('')
+    setOrderOk(false)
+  }
+
   function setPosition(pos, player) {
     setFieldingOk(false)
     setFieldingLineup(prev => {
@@ -436,6 +453,14 @@ export default function GameSetupPage({ draftKey = 'default', onStart, onBack })
             <p className="text-xs text-gray-500 mb-3">
               Drag <GripVertical size={12} className="inline text-gray-400" /> to reorder. Must strictly alternate BBH ↔ SBH.
             </p>
+            {order.some((name, i) => {
+              const prevIdx = (i + order.length - 1) % order.length
+              return order.length > 1 && rosterMap[order[prevIdx]] === rosterMap[name]
+            }) && (
+              <button onClick={autoArrangeOrder} className="btn btn-ghost btn-sm w-full mb-3 border border-gray-200 gap-1">
+                🔀 Auto-arrange alternating
+              </button>
+            )}
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}

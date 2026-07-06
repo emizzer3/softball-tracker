@@ -286,17 +286,17 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    {['Player','G','R','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG'].map(h => (
+                    {['Player','G','R','AB','H','2B','3B','HR','RBI','BB','K','AVG','OBP','SLG','KPct','BBPct'].map(h => (
                       <th
                         key={h}
                         onClick={h !== 'Player' ? () => handleSort(h) : undefined}
                         className={`py-1 font-semibold whitespace-nowrap select-none ${
                           h === 'Player' ? 'text-left px-1 text-gray-500' :
-                          ['AVG','OBP','SLG'].includes(h) ? 'text-center px-0.5 text-indigo-500 cursor-pointer hover:text-indigo-700' :
+                          ['AVG','OBP','SLG','KPct','BBPct'].includes(h) ? 'text-center px-0.5 text-indigo-500 cursor-pointer hover:text-indigo-700' :
                           'text-center px-0.5 text-gray-500 cursor-pointer hover:text-gray-700'
                         }`}
                       >
-                        {h}{sortCol === h ? (sortAsc ? ' ▲' : ' ▼') : ''}
+                        {h === 'KPct' ? 'K%' : h === 'BBPct' ? 'BB%' : h}{sortCol === h ? (sortAsc ? ' ▲' : ' ▼') : ''}
                       </th>
                     ))}
                   </tr>
@@ -316,11 +316,13 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                       <td className="py-1.5 px-0.5 text-center text-indigo-600 font-medium">{p.AVG}</td>
                       <td className="py-1.5 px-0.5 text-center text-indigo-500">{p.OBP}</td>
                       <td className="py-1.5 px-0.5 text-center text-indigo-500">{p.SLG}</td>
+                      <td className="py-1.5 px-0.5 text-center text-indigo-500">{p.KPct}%</td>
+                      <td className="py-1.5 px-0.5 text-center text-indigo-500">{p.BBPct}%</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="text-xs text-gray-400 mt-2">AVG = H/AB · OBP = (H+BB)/(AB+BB) · SLG = total bases/AB</p>
+              <p className="text-xs text-gray-400 mt-2">AVG = H/AB · OBP = (H+BB)/(AB+BB) · SLG = total bases/AB · K% = K/AB · BB% = BB/(AB+BB)</p>
 
               {/* BBH vs SBH comparison */}
               {(() => {

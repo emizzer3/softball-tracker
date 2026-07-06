@@ -1,4 +1,5 @@
 import { BarChart2, TrendingUp, Home, Shield } from 'lucide-react'
+import { computeGameStats } from '../storage'
 
 function StatBar({ label, value, max, color = '#2563eb' }) {
   const pct = max > 0 ? (value / max) * 100 : 0
@@ -16,46 +17,12 @@ function StatBar({ label, value, max, color = '#2563eb' }) {
 }
 
 export default function SummaryPage({ game, onHome }) {
-  const { atBats = [], battingOrder = [], home, away, homeScore, awayScore, date, gameType, tournamentName, roster = [], playLog = [], playerPositions = {} } = game
-  const rosterMap = Object.fromEntries(roster.map(p => [p.name, p.type]))
+  const { home, away, homeScore, awayScore, date, gameType, tournamentName } = game
 
-  // Hit type breakdown
-  const hitTypes = { '1B': 0, '2B': 0, '3B': 0, 'HR': 0 }
-  const outTypes  = { 'K': 0, 'F': 0, 'G': 0, 'E': 0, 'FC': 0, 'SAC': 0 }
-  for (const ab of atBats) {
-    if (hitTypes[ab.outcome] !== undefined) hitTypes[ab.outcome]++
-    if (outTypes[ab.outcome] !== undefined) outTypes[ab.outcome]++
-  }
-  const totalHits = Object.values(hitTypes).reduce((a, b) => a + b, 0)
-  const totalOuts = Object.values(outTypes).reduce((a, b) => a + b, 0)
-  const totalAB = atBats.filter(ab => !['BB','HBP','SAC'].includes(ab.outcome)).length
-  const totalBB = atBats.filter(ab => ab.outcome === 'BB').length
-  const teamAVG = totalAB > 0 ? (totalHits / totalAB).toFixed(3).replace(/^0/, '') : '.000'
-  const teamOBP = (totalAB + totalBB) > 0 ? ((totalHits + totalBB) / (totalAB + totalBB)).toFixed(3).replace(/^0/, '') : '.000'
-
-  // Per-player batting stats
-  const playerStats = battingOrder.map(name => {
-    const abs = atBats.filter(ab => ab.batter === name)
-    const AB  = abs.filter(ab => !['BB','HBP','SAC'].includes(ab.outcome)).length
-    const H   = abs.filter(ab => ['1B','2B','3B','HR'].includes(ab.outcome)).length
-    const BB  = abs.filter(ab => ab.outcome === 'BB').length
-    const K   = abs.filter(ab => ab.outcome === 'K').length
-    const RBI = abs.reduce((s, ab) => s + (ab.rbi || 0), 0)
-    const HR  = abs.filter(ab => ab.outcome === 'HR').length
-    const AVG = AB > 0 ? (H / AB).toFixed(3).replace(/^0/, '') : '-'
-    const type = rosterMap[name]
-    return { name, AB, H, BB, K, RBI, HR, AVG, type }
-  }).sort((a, b) => b.H - a.H)
-
-  // Per-player fielding stats
-  const fieldingStats = battingOrder.map(name => {
-    const PO = playLog.filter(l => (l.type === 'putout' || l.type === 'runnerOut') && l.fielder  === name).length
-    const A  = playLog.filter(l => (l.type === 'putout' || l.type === 'runnerOut') && l.assister === name).length
-    const E  = playLog.filter(l => l.type === 'error'  && l.fielder  === name).length
-    const pos = playerPositions[name] || ''
-    return { name, pos, PO, A, E }
-  })
-  const hasFieldingData = fieldingStats.some(f => f.PO + f.A + f.E > 0)
+  const {
+    hitTypes, outTypes, totalHits, totalOuts, totalAB, totalBB,
+    teamAVG, teamOBP, playerStats, fieldingStats, hasFieldingData,
+  } = computeGameStats(game)
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
