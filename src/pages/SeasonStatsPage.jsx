@@ -269,10 +269,10 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 📈 Trends
               </button>
               <button
-                onClick={() => setActiveTab('insights')}
-                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'insights' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => setActiveTab('players')}
+                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'players' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                💡 Insights
+                💡 Players
               </button>
             </div>
             <button onClick={() => setShowGuide(true)} className="btn btn-ghost btn-sm text-xs gap-1 text-blue-500 py-0.5">
@@ -617,8 +617,8 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
             )
           })()}
 
-          {/* Insights tab */}
-          {activeTab === 'insights' && (() => {
+          {/* Players tab */}
+          {activeTab === 'players' && (() => {
             const OUT_TYPES = ['K', 'F', 'G', 'FC', 'SAC']
             const OUT_LABELS = { K: 'Strikeout', F: 'Flyout', G: 'Groundout', FC: "Fielder's Choice", SAC: 'Sacrifice' }
             const OUT_COLORS = { K: '#ef4444', F: '#f97316', G: '#eab308', FC: '#a855f7', SAC: '#6b7280' }

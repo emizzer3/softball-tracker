@@ -33,7 +33,7 @@ describe('hot/cold streak badge', () => {
       ],
     })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    fireEvent.click(screen.getByText('💡 Insights'))
+    fireEvent.click(screen.getByText('💡 Players'))
     // Alice season AVG .400, last 3 games: 6/9 = .667 — hot
     expect(screen.getByText('🔥')).toBeInTheDocument()
   })
@@ -49,7 +49,7 @@ describe('hot/cold streak badge', () => {
       ],
     })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    fireEvent.click(screen.getByText('💡 Insights'))
+    fireEvent.click(screen.getByText('💡 Players'))
     // Alice season AVG .400, last 3 games: 0/9 = .000 — cold
     expect(screen.getByText('🥶')).toBeInTheDocument()
   })
@@ -62,7 +62,7 @@ describe('hot/cold streak badge', () => {
       ],
     })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    fireEvent.click(screen.getByText('💡 Insights'))
+    fireEvent.click(screen.getByText('💡 Players'))
     expect(screen.queryByText('🔥')).not.toBeInTheDocument()
     expect(screen.queryByText('🥶')).not.toBeInTheDocument()
   })
