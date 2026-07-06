@@ -263,16 +263,22 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 ⚾ Batting
               </button>
               <button
-                onClick={() => setActiveTab('trends')}
-                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'trends' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => setActiveTab('team')}
+                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'team' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                📈 Trends
+                🎯 Team
               </button>
               <button
                 onClick={() => setActiveTab('players')}
                 className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'players' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 💡 Players
+              </button>
+              <button
+                onClick={() => setActiveTab('trends')}
+                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'trends' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                📈 Trends
               </button>
             </div>
             <button onClick={() => setShowGuide(true)} className="btn btn-ghost btn-sm text-xs gap-1 text-blue-500 py-0.5">
@@ -435,8 +441,8 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
             </div>
           )}
 
-          {/* Trends tab */}
-          {activeTab === 'trends' && (() => {
+          {/* Team tab */}
+          {activeTab === 'team' && (() => {
             const runs = computeRunsPerGame()
             const sortedGames = games.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''))
             const battingByGame = sortedGames
@@ -449,21 +455,6 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 const hrs     = abs.filter(ab => ab.outcome === 'HR').length
                 return { gameId: g.id, date: g.date, singles, doubles, triples, hrs, total: singles + doubles + triples + hrs, result: g.result }
               })
-
-            // Spray chart data: collect all hit dots across all games (include batter for interactivity)
-            const allDots = sortedGames.flatMap(g =>
-              (g.atBats || []).filter(ab => ab.hitLocation && !ab.isOpponent).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter }))
-            )
-            const sprayBatters = [...new Set(allDots.map(d => d.batter).filter(Boolean))]
-            const perGameSpray = sortedGames
-              .filter(g => (g.atBats || []).some(ab => ab.hitLocation && !ab.isOpponent))
-              .map(g => ({
-                gameId: g.id,
-                date: g.date,
-                opponent: g.setup?.weAreHome !== false ? g.away : g.home,
-                result: g.result,
-                dots: (g.atBats || []).filter(ab => ab.hitLocation && !ab.isOpponent).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter })),
-              }))
 
             const maxRuns = runs.length > 0 ? Math.max(...runs.map(g => Math.max(g.ourRuns, g.theirRuns)), 1) : 1
             const maxHits = battingByGame.length > 0 ? Math.max(...battingByGame.map(g => g.total), 1) : 1
@@ -554,6 +545,34 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                   </div>
                 )}
 
+                {runs.length < 2 && battingByGame.length < 2 && (
+                  <p className="text-gray-400 text-sm text-center py-3">Play at least 2 games to see team trend charts</p>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Trends tab */}
+          {activeTab === 'trends' && (() => {
+            const sortedGames = games.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+
+            // Spray chart data: collect all hit dots across all games (include batter for interactivity)
+            const allDots = sortedGames.flatMap(g =>
+              (g.atBats || []).filter(ab => ab.hitLocation && !ab.isOpponent).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter }))
+            )
+            const sprayBatters = [...new Set(allDots.map(d => d.batter).filter(Boolean))]
+            const perGameSpray = sortedGames
+              .filter(g => (g.atBats || []).some(ab => ab.hitLocation && !ab.isOpponent))
+              .map(g => ({
+                gameId: g.id,
+                date: g.date,
+                opponent: g.setup?.weAreHome !== false ? g.away : g.home,
+                result: g.result,
+                dots: (g.atBats || []).filter(ab => ab.hitLocation && !ab.isOpponent).map(ab => ({ x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome, batter: ab.batter })),
+              }))
+
+            return (
+              <div className="space-y-6">
                 {/* Season spray chart — aggregate with player filter */}
                 {allDots.length > 0 && (
                   <div>
@@ -610,8 +629,8 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                   </div>
                 )}
 
-                {runs.length < 2 && allDots.length === 0 && (
-                  <p className="text-gray-400 text-sm text-center py-6">Play at least 2 games to see trends</p>
+                {allDots.length === 0 && (
+                  <p className="text-gray-400 text-sm text-center py-6">Play at least 2 games to see spray charts</p>
                 )}
               </div>
             )

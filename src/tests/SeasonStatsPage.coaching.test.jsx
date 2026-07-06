@@ -69,7 +69,7 @@ describe('hot/cold streak badge', () => {
 })
 
 describe('runs per game chart', () => {
-  it('shows runs chart in Trends tab when 2+ games exist', () => {
+  it('shows runs chart in Team tab when 2+ games exist', () => {
     setupMocks({
       runs: [
         { gameId: 'g1', date: '2024-05-01', ourRuns: 7, theirRuns: 3, result: 'W', opponent: 'Bulls' },
@@ -77,14 +77,14 @@ describe('runs per game chart', () => {
       ],
     })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    fireEvent.click(screen.getByText('📈 Trends'))
+    fireEvent.click(screen.getByText('🎯 Team'))
     expect(screen.getByText('Runs Scored vs Allowed')).toBeInTheDocument()
   })
 
   it('hides chart when fewer than 2 games', () => {
     setupMocks({ runs: [] })
     render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
-    fireEvent.click(screen.getByText('📈 Trends'))
+    fireEvent.click(screen.getByText('🎯 Team'))
     expect(screen.queryByText('Runs Scored vs Allowed')).not.toBeInTheDocument()
   })
 })
