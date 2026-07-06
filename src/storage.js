@@ -357,6 +357,84 @@ export function computeRunsPerGame(gamesInput) {
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+// ── Situational team hitting: RISP / LOB / GIDP (for Team tab) ───────────
+export function computeSituationalStats(gamesInput) {
+  const games = gamesInput || getGames()
+
+  let totalAB = 0, totalH = 0
+  let rispAB = 0, rispH = 0
+  let lobTotal = 0, lobGames = 0
+  let gidpCount = 0
+  const playerRisp = {}
+
+  function ensurePlayer(name) {
+    if (!playerRisp[name]) playerRisp[name] = { AB: 0, H: 0 }
+    return playerRisp[name]
+  }
+
+  for (const game of games) {
+    const atBats = game.atBats || []
+    const lastOurAtBatByHalf = {}
+    let gameHasOurAtBat = false
+
+    atBats.forEach((ab, i) => {
+      if (ab.isOpponent) return
+      gameHasOurAtBat = true
+
+      const prev = atBats[i - 1]
+      const basesBefore = (prev && prev.inning === ab.inning && prev.half === ab.half)
+        ? prev.bases
+        : [false, false, false]
+
+      const isAB = !['BB', 'HBP', 'SAC'].includes(ab.outcome)
+      const isHit = ['1B', '2B', '3B', 'HR'].includes(ab.outcome)
+
+      if (isAB) {
+        totalAB++
+        if (isHit) totalH++
+
+        if (basesBefore[1] || basesBefore[2]) {
+          rispAB++
+          const p = ensurePlayer(ab.batter)
+          p.AB++
+          if (isHit) { rispH++; p.H++ }
+        }
+      }
+
+      lastOurAtBatByHalf[`${ab.inning}-${ab.half}`] = ab
+    })
+
+    if (gameHasOurAtBat) lobGames++
+    for (const key in lastOurAtBatByHalf) {
+      lobTotal += lastOurAtBatByHalf[key].bases.filter(Boolean).length
+    }
+
+    for (const play of (game.playLog || [])) {
+      if (play.type === 'putout' && (play.doublePlay || play.triplePlay) && play.batter) {
+        gidpCount++
+      }
+    }
+  }
+
+  const fmtAvg = n => n.toFixed(3).replace(/^0/, '')
+
+  const players = Object.entries(playerRisp)
+    .map(([name, s]) => ({ name, rispAB: s.AB, rispH: s.H, rispAvg: fmtAvg(s.H / s.AB) }))
+    .sort((a, b) => parseFloat(b.rispAvg) - parseFloat(a.rispAvg))
+
+  return {
+    team: {
+      rispAB, rispH,
+      rispAvg: rispAB > 0 ? fmtAvg(rispH / rispAB) : '.000',
+      overallAvg: totalAB > 0 ? fmtAvg(totalH / totalAB) : '.000',
+      lobTotal,
+      lobPerGame: lobGames > 0 ? +(lobTotal / lobGames).toFixed(1) : 0,
+      gidpCount,
+    },
+    players,
+  }
+}
+
 // ── BBH vs SBH aggregate batting stats ───────────────────────────────────
 export function computeGroupStats() {
   const roster = getRoster()
