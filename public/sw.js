@@ -1,4 +1,4 @@
-const CACHE = 'softball-v1'
+const CACHE = 'softball-v2'
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -22,17 +22,33 @@ self.addEventListener('activate', e => {
 })
 
 self.addEventListener('fetch', e => {
-  // Cache-first for same-origin, network-first for others
-  if (e.request.url.startsWith(self.location.origin)) {
+  if (!e.request.url.startsWith(self.location.origin)) return
+
+  // The HTML shell references content-hashed asset filenames that change on every
+  // deploy, and old hashes are deleted from the server (deploy replaces dist wholesale).
+  // A stale cached shell would point at 404s, so navigations must go network-first.
+  if (e.request.mode === 'navigate') {
     e.respondWith(
-      caches.match(e.request).then(cached => {
-        const network = fetch(e.request).then(res => {
+      fetch(e.request)
+        .then(res => {
           const clone = res.clone()
           caches.open(CACHE).then(cache => cache.put(e.request, clone))
           return res
         })
-        return cached || network
-      })
+        .catch(() => caches.match(e.request))
     )
+    return
   }
+
+  // Static assets are content-hashed and immutable once fetched, so cache-first is safe.
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      const network = fetch(e.request).then(res => {
+        const clone = res.clone()
+        caches.open(CACHE).then(cache => cache.put(e.request, clone))
+        return res
+      })
+      return cached || network
+    })
+  )
 })
