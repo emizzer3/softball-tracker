@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Trophy, Calendar, Home, Trash2, BookOpen, X } from 'lucide-react'
-import { getGames, computeSeasonStats, computePlayerGameLog, deleteGame, getSeasonRecord, computeRunsPerGame, computeGroupStats } from '../storage'
+import { getGames, computeSeasonStats, computePlayerGameLog, deleteGame, getSeasonRecord, computeRunsPerGame, computeGroupStats, computeSituationalStats } from '../storage'
 
 const STAT_TIPS = {
   G:    { label: 'Games',           desc: 'Number of games this player batted in.' },
@@ -548,6 +548,65 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 {runs.length < 2 && battingByGame.length < 2 && (
                   <p className="text-gray-400 text-sm text-center py-3">Play at least 2 games to see team trend charts</p>
                 )}
+
+                {/* Situational hitting: RISP / LOB / GIDP */}
+                {(() => {
+                  const { team, players } = computeSituationalStats()
+                  const delta = team.rispAB > 0 ? (parseFloat(team.rispAvg) - parseFloat(team.overallAvg)) : 0
+                  const fmtDelta = v => (v >= 0 ? '+' : '') + v.toFixed(3).replace(/^0/, '').replace(/^-0/, '-')
+
+                  return (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Situational Hitting</p>
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2 text-center">
+                          <p className="text-[10px] text-gray-500 uppercase tracking-wide">RISP AVG</p>
+                          <p className="text-lg font-black text-indigo-600">{team.rispAvg}</p>
+                          {team.rispAB > 0 && (
+                            <p className="text-[10px] text-gray-400">{fmtDelta(delta)} vs {team.overallAvg}</p>
+                          )}
+                        </div>
+                        <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-center">
+                          <p className="text-[10px] text-gray-500 uppercase tracking-wide">LOB / Game</p>
+                          <p className="text-lg font-black text-amber-600">{team.lobPerGame}</p>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-100 rounded-lg p-2 text-center">
+                          <p className="text-[10px] text-gray-500 uppercase tracking-wide">GIDP</p>
+                          <p className="text-lg font-black text-gray-600">{team.gidpCount}</p>
+                        </div>
+                      </div>
+
+                      {players.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Clutch Hitting (RISP)</p>
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b border-gray-200 text-gray-500">
+                                {['Player','RISP AB','RISP H','RISP AVG'].map(h => (
+                                  <th key={h} className={`py-1 font-semibold whitespace-nowrap ${h === 'Player' ? 'text-left px-1' : 'text-center px-0.5'}`}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {players.map(p => (
+                                <tr key={p.name} className="border-b border-gray-100 hover:bg-gray-50">
+                                  <td className="py-1.5 px-1 font-medium whitespace-nowrap">{p.name}</td>
+                                  <td className="py-1.5 px-0.5 text-center">{p.rispAB}</td>
+                                  <td className="py-1.5 px-0.5 text-center">{p.rispH}</td>
+                                  <td className="py-1.5 px-0.5 text-center text-indigo-600 font-medium">{p.rispAvg}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-sm text-center py-3">No runners in scoring position yet this season</p>
+                      )}
+
+                      <p className="text-[10px] text-gray-400 mt-2">LOB may be slightly overcounted on innings ending in a caught-stealing/pickoff rather than a batted out.</p>
+                    </div>
+                  )
+                })()}
               </div>
             )
           })()}
