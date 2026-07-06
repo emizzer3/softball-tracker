@@ -83,7 +83,7 @@ result = interleave(first, second)   // same loop as autoArrangeOrder
 
 ### Return shape
 
-`string[]` — a batting order (array of player names), same shape as the `order` state in `GameSetupPage.jsx` and the same shape `autoArrangeOrder` already produces. Guaranteed to pass the existing `validateOrder()` alternation check.
+`string[]` — a batting order (array of player names), same shape as the `order` state in `GameSetupPage.jsx` and the same shape `autoArrangeOrder` already produces. Alternation quality matches `autoArrangeOrder` exactly, since Step 5 reuses its interleave logic verbatim: when the two streams are equal length, the result strictly alternates including the wraparound (last player back to first); when they differ, any leftover clash is inherent to the count imbalance (mathematically unavoidable for *any* algorithm — an odd total, or streams differing by 2+, cannot form a fully alternating cycle) and is surfaced to the user via the existing `validateOrder()` check in Step 3, same as `autoArrangeOrder` today.
 
 ---
 
@@ -122,7 +122,7 @@ function optimizeOrder() {
   - Non-qualifying players (AB < 5 or no history) receive the league-average score, landing in the middle rather than top/bottom
   - Leadoff selection uses OBP, not blended score (construct a case where the highest-OBP player is not the highest-blended-score player, confirm they're picked leadoff anyway)
   - Weakest qualifying player lands last in their stream
-  - Result always alternates BBH/SBH correctly (assert against the existing `validateOrder` helper, or an equivalent check) for streams of uneven length
+  - Equal-length streams alternate correctly everywhere, including the wraparound from last player back to first (assert with an equivalent check to the existing `validateOrder` helper)
   - Single-player stream (N === 1) and empty stream (N === 0) edge cases
   - Zero qualifying players in the whole list → deterministic pass-through order
 - No existing test file covers `GameSetupPage.jsx` (confirmed: none in `src/tests/`) — add a new one, `src/tests/GameSetupPage.optimizeOrder.test.jsx`, verifying the "Optimize Order" button calls the new function and updates the visible order
