@@ -435,6 +435,76 @@ export function computeSituationalStats(gamesInput) {
   }
 }
 
+// ── Optimal batting order: rank players by season performance ────────────
+const MIN_AB_FOR_OWN_STATS = 5
+
+export function computeOptimalBattingOrder(players, gamesInput) {
+  const seasonStats = computeSeasonStats(gamesInput)
+  const statsByName = Object.fromEntries(seasonStats.map(s => [s.name, s]))
+
+  function blendedScore(name) {
+    const s = statsByName[name]
+    return (parseFloat(s.AVG) + parseFloat(s.OBP) + parseFloat(s.SLG)) / 3
+  }
+
+  function qualifies(name) {
+    const s = statsByName[name]
+    return !!s && s.AB >= MIN_AB_FOR_OWN_STATS
+  }
+
+  const qualifying = players.map(p => p.name).filter(qualifies)
+  const avgScore = qualifying.length > 0
+    ? qualifying.reduce((sum, n) => sum + blendedScore(n), 0) / qualifying.length
+    : 0
+  const avgObp = qualifying.length > 0
+    ? qualifying.reduce((sum, n) => sum + parseFloat(statsByName[n].OBP), 0) / qualifying.length
+    : 0
+
+  const scoreFor = name => (qualifies(name) ? blendedScore(name) : avgScore)
+  const obpFor = name => (qualifies(name) ? parseFloat(statsByName[name].OBP) : avgObp)
+
+  function shapeStream(stream) {
+    if (stream.length <= 1) return stream.slice()
+
+    const working = stream.slice()
+
+    // Leadoff: highest OBP. Ties keep the earliest player (strict `>`), so an
+    // all-tied stream (nobody qualifies) leaves the original first player in front.
+    let leadoffIdx = 0
+    for (let i = 1; i < working.length; i++) {
+      if (obpFor(working[i].name) > obpFor(working[leadoffIdx].name)) leadoffIdx = i
+    }
+    const leadoff = working.splice(leadoffIdx, 1)[0]
+
+    // Last: lowest blended score. Ties keep the latest player (`<=`, not `<`) so
+    // that an all-tied remainder collapses back to the true original last player —
+    // this is what makes the "nobody qualifies" case a clean pass-through instead
+    // of swapping the 2nd and last original players.
+    let lastIdx = 0
+    for (let i = 1; i < working.length; i++) {
+      if (scoreFor(working[i].name) <= scoreFor(working[lastIdx].name)) lastIdx = i
+    }
+    const last = working.splice(lastIdx, 1)[0]
+
+    const middle = working.sort((a, b) => scoreFor(b.name) - scoreFor(a.name))
+    return [leadoff, ...middle, last]
+  }
+
+  const bbhShaped = shapeStream(players.filter(p => p.type === 'BBH'))
+  const sbhShaped = shapeStream(players.filter(p => p.type === 'SBH'))
+
+  const [first, second] = bbhShaped.length >= sbhShaped.length
+    ? [bbhShaped, sbhShaped]
+    : [sbhShaped, bbhShaped]
+
+  const result = []
+  for (let i = 0; i < Math.max(first.length, second.length); i++) {
+    if (first[i]) result.push(first[i].name)
+    if (second[i]) result.push(second[i].name)
+  }
+  return result
+}
+
 // ── BBH vs SBH aggregate batting stats ───────────────────────────────────
 export function computeGroupStats() {
   const roster = getRoster()
