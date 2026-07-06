@@ -94,6 +94,11 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
   const batter = battingOrder[gs.batterIndex % battingOrder.length]
   const batterPosition = setup.playerPositions?.[batter]
   const batterType = setup.roster.find(p => p.name === batter)?.type
+  // When the opponent is batting, `batter` above is just our own upcoming hitter
+  // (batting order doesn't advance for opponent at-bats) — use the opponent's
+  // team name instead for anything display/log related.
+  const opponentName = weAreHome ? setup.away : setup.home
+  const displayBatter = isOurBatting ? batter : opponentName
 
   // Persist a new game state — pushes the OLD state to history and clears redo by default.
   // Pass { skipHistory: true } from undo/redo so they don't pollute their own stacks.
@@ -205,10 +210,9 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       else if (!isOut) newBases[by - 1] = true    // batter stops on base (not for outs)
     }
 
-    const opponentName = weAreHome ? setup.away : setup.home
     const atBat = {
       id: Date.now(),
-      batter: isOurBatting ? batter : opponentName,
+      batter: displayBatter,
       inning: g.inning,
       half: g.half,
       outcome: code,
@@ -271,7 +275,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       g.batterIndex = g.done ? g.batterIndex : (g.batterIndex + 1) % battingOrder.length
     }
 
-    setLastAction(prev => ({ ...prev, code, batter, rbi: runs }))
+    setLastAction(prev => ({ ...prev, code, batter: displayBatter, rbi: runs }))
     persist(g)
   }
 
@@ -286,9 +290,9 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       // When WE bat and strike out, the opposing catcher made the out — we don't track them.
       const catcher = !isOurBatting ? setup.fieldingLineup?.['C'] : null
       const extraLog = catcher
-        ? [{ type: 'putout', fielder: catcher, assister: null, inning: gs.inning, half: gs.half, outCode: code, batter }]
+        ? [{ type: 'putout', fielder: catcher, assister: null, inning: gs.inning, half: gs.half, outCode: code, batter: displayBatter }]
         : []
-      setLastAction({ code, batter, rbi: 0, autoFielder: catcher || null, fielder: null, assister: null })
+      setLastAction({ code, batter: displayBatter, rbi: 0, autoFielder: catcher || null, fielder: null, assister: null })
       finishOutcome(code, extraLog)
     } else if ((code === 'G' || code === 'F') && !isOurBatting) {
       // Putout modal only when WE are fielding — credit our fielder.
@@ -300,7 +304,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       setPendingOutCode('SAC')
       setShowPutout(true)
     } else {
-      setLastAction({ code, batter, rbi: 0, fielder: null, assister: null, autoFielder: null })
+      setLastAction({ code, batter: displayBatter, rbi: 0, fielder: null, assister: null, autoFielder: null })
       finishOutcome(code)
     }
   }
@@ -326,7 +330,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       setPendingSacLoc(location)
       setShowSacRuns(true)
     } else {
-      setLastAction({ code, batter, rbi: 0, fielder: null, assister: null, autoFielder: null })
+      setLastAction({ code, batter: displayBatter, rbi: 0, fielder: null, assister: null, autoFielder: null })
       finishOutcome(code, [], location)
       setPendingHitLoc(null)
     }
@@ -334,7 +338,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
 
   function confirmSacRuns(n) {
     setShowSacRuns(false)
-    setLastAction({ code: 'SAC', batter, rbi: n, fielder: null, assister: null, autoFielder: null })
+    setLastAction({ code: 'SAC', batter: displayBatter, rbi: n, fielder: null, assister: null, autoFielder: null })
     finishOutcome('SAC', [], pendingSacLoc, n)
     setPendingSacLoc(null)
   }
@@ -343,9 +347,9 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     // SAC fly when fielding: run count was captured before PutoutModal was shown
     if (pendingOutCode === 'SAC') {
       const extraLog = fielder
-        ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: 'SAC', batter }]
+        ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: 'SAC', batter: displayBatter }]
         : []
-      setLastAction({ code: 'SAC', batter, rbi: pendingSacRuns, fielder: fielder || null, assister: assister || null, autoFielder: null })
+      setLastAction({ code: 'SAC', batter: displayBatter, rbi: pendingSacRuns, fielder: fielder || null, assister: assister || null, autoFielder: null })
       finishOutcome('SAC', extraLog, pendingSacLoc, pendingSacRuns, false, false)
       setPendingOutCode(null)
       setPendingSacLoc(null)
@@ -355,7 +359,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     }
 
     const extraLog = fielder
-      ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter, doublePlay, triplePlay }]
+      ? [{ type: 'putout', fielder, assister: assister || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter: displayBatter, doublePlay, triplePlay }]
       : []
 
     // Second out (DP/TP) — a runner was thrown out; batter is null since this is a separate out
@@ -363,7 +367,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       extraLog.push({ type: 'putout', fielder: fielder2, assister: assister2 || null, inning: gs.inning, half: gs.half, outCode: pendingOutCode, batter: null })
     }
 
-    setLastAction({ code: pendingOutCode, batter, rbi: 0, fielder: fielder || null, assister: assister || null, autoFielder: null, doublePlay, triplePlay })
+    setLastAction({ code: pendingOutCode, batter: displayBatter, rbi: 0, fielder: fielder || null, assister: assister || null, autoFielder: null, doublePlay, triplePlay })
     finishOutcome(pendingOutCode, extraLog, pendingHitLoc, 0, doublePlay, triplePlay)
     setPendingOutCode(null)
     setPendingHitLoc(null)
