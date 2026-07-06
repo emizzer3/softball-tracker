@@ -40,17 +40,21 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry1.outputs.page_url || steps.deployment_retry2.outputs.page_url }}
     steps:
       - uses: actions/configure-pages@v5
       - uses: actions/deploy-pages@v4
         id: deployment
-        # GitHub Pages infra is occasionally flaky; retry up to 3 times before failing
+        continue-on-error: true
+        # GitHub Pages infra is occasionally flaky; retry up to 3 times before failing.
+        # continue-on-error on the first two attempts keeps the job from being marked
+        # failed when a later retry succeeds — only exhausting all 3 fails the job.
       - name: Retry deploy on failure
-        if: failure() && steps.deployment.outcome == 'failure'
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
         id: deployment_retry1
+        continue-on-error: true
       - name: Retry deploy (attempt 3)
-        if: failure() && steps.deployment_retry1.outcome == 'failure'
+        if: steps.deployment.outcome == 'failure' && steps.deployment_retry1.outcome == 'failure'
         uses: actions/deploy-pages@v4
         id: deployment_retry2
