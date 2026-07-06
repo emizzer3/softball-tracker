@@ -21,6 +21,11 @@ const STAT_TIPS = {
   PO:   { label: 'Putouts',         desc: 'Outs the fielder directly recorded — catching a fly ball, tagging a runner, or receiving a throw at base.' },
   A:    { label: 'Assists',         desc: 'Times the fielder threw the ball to help get a runner out.' },
   E:    { label: 'Errors',          desc: 'Times the fielder made a mistake that let a batter or runner advance when they should have been out.' },
+  RISP:    { label: 'RISP AVG',   desc: 'Batting average with a runner on 2nd or 3rd base ("in scoring position") — a single usually scores them. Shown next to your overall average so you can see if the team hits better or worse with runners in scoring position.' },
+  LOB:     { label: 'LOB / Game', desc: 'Runners Left On Base — how many runners were stranded on base when your team\'s half-inning ended, averaged per game. Lower is generally better; it means fewer scoring chances went to waste.' },
+  GIDP:    { label: 'GIDP',       desc: 'Grounded Into Double Play — times a batter\'s ground ball turned into two outs. Counted for the whole team, not per player.' },
+  RISPAB:  { label: 'RISP AB',    desc: 'At-bats that came with a runner in scoring position (2nd or 3rd base).' },
+  RISPH:   { label: 'RISP H',     desc: 'Hits earned specifically during at-bats with a runner in scoring position.' },
 }
 
 function StatGuideSheet({ onClose }) {
@@ -52,6 +57,20 @@ function StatGuideSheet({ onClose }) {
               {['PO','A','E'].map(k => (
                 <div key={k} className="flex gap-3 items-start">
                   <span className="shrink-0 w-10 text-center font-black text-xs bg-gray-100 text-gray-700 px-1 py-0.5 rounded">{k}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{STAT_TIPS[k].label}</p>
+                    <p className="text-xs text-gray-500 leading-snug">{STAT_TIPS[k].desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="pt-2 border-t border-gray-100">
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1.5">Team (Situational Hitting)</p>
+            <div className="space-y-2">
+              {['RISP','RISPAB','RISPH','LOB','GIDP'].map(k => (
+                <div key={k} className="flex gap-3 items-start">
+                  <span className="shrink-0 w-10 text-center font-black text-xs bg-gray-100 text-gray-700 px-1 py-0.5 rounded">{k === 'RISPAB' ? 'AB' : k === 'RISPH' ? 'H' : k}</span>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{STAT_TIPS[k].label}</p>
                     <p className="text-xs text-gray-500 leading-snug">{STAT_TIPS[k].desc}</p>
