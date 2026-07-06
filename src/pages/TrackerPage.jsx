@@ -151,6 +151,8 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     const by = BASES_ON_OUTCOME[code] || 0
     const isOut = ['K','F','G','SAC','FC'].includes(code)
     const scoringTeam = gs.half === 'top' ? 'away' : 'home'
+    const finalBalls = gs.balls
+    const finalStrikes = gs.strikes
     const g = { ...gs, balls: 0, strikes: 0 }
 
     let newBases = [...g.bases]
@@ -221,7 +223,7 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
       rbi: runs,
       bases: [...newBases],
       hitLocation: hitLocation || null,
-      ...(isOurBatting ? {} : { isOpponent: true }),
+      ...(isOurBatting ? { finalBalls, finalStrikes } : { isOpponent: true }),
     }
     g.atBats = [...g.atBats, atBat]
 

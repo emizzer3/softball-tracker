@@ -190,6 +190,8 @@ export function computeSeasonStats(gamesInput) {
         AB: 0, H: 0, '1B': 0, '2B': 0, '3B': 0, HR: 0, R: 0, RBI: 0, BB: 0, K: 0,
         // fielding
         PO: 0, A: 0, E: 0,
+        // pitch counts (only for PAs where count was tracked)
+        pitchPA: 0, totalPitches: 0, deepCounts: 0,
       }
     }
     return stats[name]
@@ -212,6 +214,12 @@ export function computeSeasonStats(gamesInput) {
       if (outcome === 'K')   s.K++
       s.RBI += (ab.rbi || 0)
       if (outcome === 'HR') s.R++
+      if (ab.finalBalls != null && ab.finalStrikes != null) {
+        const pitches = ab.finalBalls + ab.finalStrikes + 1
+        s.pitchPA++
+        s.totalPitches += pitches
+        if (pitches >= 4) s.deepCounts++
+      }
     }
 
     // W/L/D credited once per player per game (not once per at-bat)
@@ -244,11 +252,13 @@ export function computeSeasonStats(gamesInput) {
       AVG:    s.AB > 0 ? (s.H / s.AB).toFixed(3).replace(/^0/, '') : '.000',
       OBP:    (s.AB + s.BB) > 0 ? ((s.H + s.BB) / (s.AB + s.BB)).toFixed(3).replace(/^0/, '') : '.000',
       SLG:    s.AB > 0 ? (tb / s.AB).toFixed(3).replace(/^0/, '') : '.000',
-      KPct:   s.AB > 0 ? (s.K  / s.AB * 100).toFixed(1) : '0.0',
-      BBPct:  pa       > 0 ? (s.BB / pa    * 100).toFixed(1) : '0.0',
-      POPerG: gCount   > 0 ? (s.PO / gCount).toFixed(1) : '0.0',
-      APerG:  gCount   > 0 ? (s.A  / gCount).toFixed(1) : '0.0',
-      EPerG:  gCount   > 0 ? (s.E  / gCount).toFixed(1) : '0.0',
+      KPct:      s.AB > 0 ? (s.K  / s.AB * 100).toFixed(1) : '0.0',
+      BBPct:     pa       > 0 ? (s.BB / pa    * 100).toFixed(1) : '0.0',
+      POPerG:    gCount   > 0 ? (s.PO / gCount).toFixed(1) : '0.0',
+      APerG:     gCount   > 0 ? (s.A  / gCount).toFixed(1) : '0.0',
+      EPerG:     gCount   > 0 ? (s.E  / gCount).toFixed(1) : '0.0',
+      PPerPA:    s.pitchPA > 0 ? (s.totalPitches / s.pitchPA).toFixed(1) : null,
+      DeepPct:   s.pitchPA > 0 ? (s.deepCounts / s.pitchPA * 100).toFixed(0) : null,
     }
   }).sort((a, b) => b.AB - a.AB)
 }

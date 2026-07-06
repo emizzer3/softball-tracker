@@ -396,6 +396,40 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                   </div>
                 )
               })()}
+
+              {/* Pitch patience sub-table */}
+              {(() => {
+                const pitchPlayers = stats.filter(p => p.PPerPA != null)
+                if (pitchPlayers.length === 0) return null
+                const sorted = [...pitchPlayers].sort((a, b) => parseFloat(b.PPerPA) - parseFloat(a.PPerPA))
+                return (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pitch Patience</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-200 text-gray-500">
+                            {['Player','PAs tracked','P/PA','Deep count %'].map(h => (
+                              <th key={h} className={`py-1 font-semibold whitespace-nowrap ${h === 'Player' ? 'text-left px-1' : 'text-center px-1'}`}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sorted.map(p => (
+                            <tr key={p.name} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="py-1.5 px-1 font-medium whitespace-nowrap">{p.name}</td>
+                              <td className="py-1.5 px-1 text-center text-gray-500">{p.pitchPA}</td>
+                              <td className="py-1.5 px-1 text-center font-semibold text-indigo-600">{p.PPerPA}</td>
+                              <td className="py-1.5 px-1 text-center">{p.DeepPct}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">P/PA = avg pitches per plate appearance · Deep count = 4+ pitches</p>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
