@@ -3,7 +3,7 @@ import { CheckCircle, Circle, AlertCircle, ChevronLeft, GripVertical, X } from '
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft, getTeamConfig } from '../storage'
+import { getRoster, getTeams, getDivision, getTournaments, rememberTournament, getSetupDraft, saveSetupDraft, clearSetupDraft, getTeamConfig, computeOptimalBattingOrder } from '../storage'
 import { pushKey } from '../sync'
 
 // Defined OUTSIDE GameSetupPage so React doesn't treat it as a new component
@@ -185,6 +185,13 @@ export default function GameSetupPage({ draftKey = 'default', onStart, onBack })
       if (second[i]) arranged.push(second[i])
     }
     setOrder(arranged)
+    setOrderErr('')
+    setOrderOk(false)
+  }
+
+  function optimizeOrder() {
+    const players = order.map(name => ({ name, type: rosterMap[name] }))
+    setOrder(computeOptimalBattingOrder(players))
     setOrderErr('')
     setOrderOk(false)
   }
@@ -461,6 +468,9 @@ export default function GameSetupPage({ draftKey = 'default', onStart, onBack })
                 🔀 Auto-arrange alternating
               </button>
             )}
+            <button onClick={optimizeOrder} className="btn btn-ghost btn-sm w-full mb-3 border border-gray-200 gap-1">
+              🧠 Optimize Order
+            </button>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
