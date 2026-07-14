@@ -69,19 +69,23 @@ const ROSTER = [
 
 describe('computePlayerCard — qualifying player with strengths and needs-work', () => {
   it('ranks tips by severity (normalized gap), not raw gap, and picks a pose from the uncapped set', () => {
-    // PlayerX: AB=10, H=6 (1B), BB=0, K=1 -> AVG=.600 OBP=.600 SLG=.600 KPct=10.0 BBPct=0.0
-    // Mate1 & Mate2 (identical): AB=10, H=3 (1B), BB=4, K=3 -> AVG=.300 OBP=.500 SLG=.300 KPct=30.0 BBPct=28.6
+    // makeAtBats(batter, hits, outs, walks) sets AB = hits + outs (every "out" here
+    // is coded as outcome 'K') and BB = walks separately — so to land on AB=10 for
+    // each player, `outs` must be (10 - hits), not an arbitrary K count.
+    // PlayerX: hits=6, outs=4, walks=0 -> AB=10, H=6, K=4, BB=0 -> AVG=.600 OBP=.600 SLG=.600 KPct=40.0 BBPct=0.0
+    // Mate1 & Mate2 (identical): hits=3, outs=7, walks=4 -> AB=10, H=3, K=7, BB=4 -> AVG=.300 OBP=7/14=.500 SLG=.300 KPct=70.0 BBPct=4/14*100=28.6
     // Baseline (raw sums across all 3, PlayerX included, per spec Step 3):
-    //   AB=30 H=12 BB=8 K=7 TB=12 -> AVG=.400 OBP=20/38=.5263 SLG=.400 KPct=23.33 BBPct=8/38*100=21.05
-    // Severities: AVG=(.6-.4)/.05=4.0  OBP=(.6-.5263)/.05=1.47  SLG=4.0  KPct=((10-23.33)*-1)/5=2.67  BBPct=(0-21.05)/5=-4.21
-    // Strengths sorted desc: AVG(4.0), SLG(4.0, tie broken by original AVG/OBP/SLG/KPct/BBPct order), KPct(2.67), OBP(1.47)
+    //   AB=30 H=12 BB=8 K=18 TB=12 -> AVG=.400 OBP=20/38=.5263 SLG=.400 KPct=18/30*100=60.0 BBPct=8/38*100=21.05
+    // Severities: AVG=(.6-.4)/.05=4.0  OBP=(.6-.5263)/.05=1.47  SLG=4.0  KPct=((40-60)*-1)/5=4.0  BBPct=(0-21.05)/5=-4.21
+    // Strengths sorted desc: AVG(4.0), SLG(4.0), KPct(4.0) tied — tie broken by original AVG/OBP/SLG/KPct/BBPct
+    // iteration order, so AVG then SLG then KPct — then OBP(1.47) last among strengths.
     // -> capped top 3 display: AVG, SLG, KPct (OBP loses the cap slot to KPct despite being pose-eligible)
     // -> pose picked from the FULL uncapped set restricted to {AVG,OBP,SLG,BBPct}: AVG(4.0) beats SLG(4.0, later in
     //    the stable sort) and OBP(1.47) -> pose 'contact', headline AVG
     seedGame('g1', ROSTER,
-      ['PlayerX', 6, 1, 0],
-      ['Mate1', 3, 3, 4],
-      ['Mate2', 3, 3, 4],
+      ['PlayerX', 6, 4, 0],
+      ['Mate1', 3, 7, 4],
+      ['Mate2', 3, 7, 4],
     )
     const card = computePlayerCard('PlayerX')
 
@@ -95,11 +99,14 @@ describe('computePlayerCard — qualifying player with strengths and needs-work'
   })
 
   it('picks the patient pose from BBPct even though OBP is the headline stat shown', () => {
-    // PlayerC: AB=5 (qualifies), H=1, BB=10, K=4 -> AVG=.200 OBP=11/15=.733 SLG=.200 KPct=80.0 BBPct=10/15*100=66.7
-    // Teammate: AB=10, H=3, BB=0, K=3 -> AVG=.300 OBP=.300 SLG=.300 KPct=30.0 BBPct=0.0
-    // Baseline: AB=15 H=4 BB=10 K=7 TB=4 -> AVG=4/15=.2667 OBP=14/25=.560 SLG=.2667 KPct=46.67 BBPct=10/25*100=40.0
+    // PlayerC: hits=1, outs=4, walks=10 -> AB=5 (qualifies), H=1, BB=10, K=4 -> AVG=.200 OBP=11/15=.733 SLG=.200 KPct=80.0 BBPct=10/15*100=66.7
+    // Teammate: hits=3, outs=7 (not 3 — AB must be 10, and AB = hits + outs for this helper), walks=0
+    //   -> AB=10, H=3, BB=0, K=7 -> AVG=.300 OBP=.300 SLG=.300 KPct=70.0 BBPct=0.0
+    // Baseline: AB=15 H=4 BB=10 K=11 TB=4 -> AVG=4/15=.2667 OBP=14/25=.560 SLG=.2667 KPct=11/15*100=73.33 BBPct=10/25*100=40.0
     // OBP severity=(.733-.560)/.05=3.47 (strength) | BBPct severity=(66.7-40.0)/5=5.34 (strength, higher than OBP)
     // -> pose-eligible top is BBPct, which maps to 'patient', but headlineStat is always OBP for that pose.
+    // (KPct also moves — player 80.0 vs baseline 73.33, severity -1.33, needsWork — but this test doesn't assert
+    // on needsWork, only pose and headlineStat, so that shift doesn't affect any assertion below.)
     saveGame({
       id: 'g2', date: '2024-05-01', gameType: 'League',
       home: 'Renegades', away: 'Bulls', homeScore: 1, awayScore: 0, result: 'W',
@@ -109,7 +116,7 @@ describe('computePlayerCard — qualifying player with strengths and needs-work'
       ],
       atBats: [
         ...makeAtBats('PlayerC', 1, 4, 10),
-        ...makeAtBats('Teammate', 3, 3, 0),
+        ...makeAtBats('Teammate', 3, 7, 0),
       ],
       playLog: [],
     })
@@ -432,7 +439,20 @@ describe('computePlayerCard — spray-zone insight', () => {
         { id: 'f-g2', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false], hitLocation: { x: 95, y: 235 } },
         { id: 'f-k0', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
         { id: 'f-k1', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
-        ...makeAtBats('Teammate', 5, 3, 0).map((ab, i) => i < 2 ? { ...ab, outcome: 'K' } : ab), // K=2, matches PlayerF
+        // Teammate: same composition as PlayerF (5x '1B', 3x 'G', 2x 'K' -> AB=10 H=5 K=2 BB=0),
+        // built explicitly rather than via makeAtBats (which only ever labels outs 'K', so it
+        // can't produce a 5/3/2 split of 1B/G/K on its own). No hitLocation needed here — spray
+        // is keyed by batter name, so Teammate's dots (there are none) don't affect PlayerF's.
+        { id: 't-h0', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-h1', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-h2', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-h3', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-h4', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-g0', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false] },
+        { id: 't-g1', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false] },
+        { id: 't-g2', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false] },
+        { id: 't-k0', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
+        { id: 't-k1', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
       ],
       playLog: [],
     })
