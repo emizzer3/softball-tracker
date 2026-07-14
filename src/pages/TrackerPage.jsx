@@ -528,8 +528,18 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
     const newAtBats = [...gs.atBats]
     const last = newAtBats[newAtBats.length - 1]
     const newRbi = Math.max(0, (last.rbi || 0) + delta)
+    const runDelta = newRbi - (last.rbi || 0)
     newAtBats[newAtBats.length - 1] = { ...last, rbi: newRbi }
     const newGs = { ...gs, atBats: newAtBats }
+    if (runDelta !== 0) {
+      const scoringTeam = last.half === 'top' ? 'away' : 'home'
+      if (scoringTeam === 'home') newGs.homeScore = Math.max(0, newGs.homeScore + runDelta)
+      else newGs.awayScore = Math.max(0, newGs.awayScore + runDelta)
+      const scores = [...newGs.inningScores]
+      const idx = last.inning - 1
+      scores[idx] = { ...scores[idx], [scoringTeam]: Math.max(0, (scores[idx]?.[scoringTeam] || 0) + runDelta) }
+      newGs.inningScores = scores
+    }
     setLastAction(prev => prev ? { ...prev, rbi: newRbi } : prev)
     persist(newGs)
   }
@@ -639,6 +649,37 @@ export default function TrackerPage({ setup, savedState, onEnd, onBack }) {
             <span className={`px-2 py-0.5 rounded ${gs.outs >= 3 ? 'bg-red-500 text-white' : 'bg-gray-200'}`}>OUT</span>
           </div>
           <span className="text-4xl font-black">{gs.homeScore}</span>
+        </div>
+
+        {/* Line score — runs per inning so far, plus running total */}
+        <div className="mt-2 pt-2 border-t border-gray-100 overflow-x-auto">
+          <table className="w-full text-[11px] text-center border-collapse">
+            <thead>
+              <tr className="text-gray-400">
+                <th className="text-left font-semibold pr-1 whitespace-nowrap">Inning</th>
+                {Array.from({ length: gs.inning }, (_, i) => (
+                  <th key={i} className={`px-1 font-semibold ${i + 1 === gs.inning ? 'text-gray-600' : ''}`}>{i + 1}</th>
+                ))}
+                <th className="px-1 font-bold border-l border-gray-200 text-gray-600">R</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="text-left font-semibold text-gray-500 pr-1 whitespace-nowrap">{setup.away}</td>
+                {Array.from({ length: gs.inning }, (_, i) => (
+                  <td key={i} className="px-1 text-gray-600">{gs.inningScores[i]?.away || 0}</td>
+                ))}
+                <td className="px-1 font-bold border-l border-gray-200">{gs.awayScore}</td>
+              </tr>
+              <tr>
+                <td className="text-left font-semibold text-gray-500 pr-1 whitespace-nowrap">{setup.home}</td>
+                {Array.from({ length: gs.inning }, (_, i) => (
+                  <td key={i} className="px-1 text-gray-600">{gs.inningScores[i]?.home || 0}</td>
+                ))}
+                <td className="px-1 font-bold border-l border-gray-200">{gs.homeScore}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
