@@ -84,11 +84,11 @@ For each of these stat/direction pairs, compute `player_value - baseline_value` 
 | K%   | ±5 pts (lower=better) | "Rarely strikes out — great plate discipline." | "Strikeout rate is high — see the ball, shorten the swing." |
 | BB%  | ±5 pts (higher=better) | "Draws a lot of walks — great eye at the plate." | "Rarely walks — work the count and be more selective." |
 
-Collect all strengths and all needs-work into two lists, each sorted by gap size descending, each capped at 3. If both lists are empty, set a single `neutral: true` flag with the message "Right around team average across the board — consistent, well-rounded hitter."
+**Ranking uses severity, not raw gap.** AVG/OBP/SLG gaps live on a ~0-0.3 decimal scale while K%/BB% gaps live on a ~0-50 percentage-point scale — sorting by raw gap would let K%/BB% dominate every ranking regardless of how meaningful the AVG/OBP/SLG difference actually is. Instead, compute `severity = signedGap / threshold` for each stat that clears its threshold (e.g. an AVG gap of `.200` against a `.050` threshold is severity `4.0`; a K% gap of `20` points against a `5` threshold is also severity `4.0` — now directly comparable). Collect all strengths and all needs-work into two lists, each **sorted by severity descending**, each capped at 3. If both lists are empty, set a single `neutral: true` flag with the message "Right around team average across the board — consistent, well-rounded hitter."
 
 ### Step 5: Pick the illustration pose and headline stat
 
-Restrict to the strengths list filtered to `{AVG, OBP, SLG, BBPct}` (K% has no positive pose — it's a rate to minimize, not something to depict). Take the single largest-gap entry among those and map to a pose:
+This uses the **full set of stats that cleared the strength threshold in Step 4, before the top-3 display cap is applied** — not the final capped `strengths` list. That decoupling matters: K% almost never has the single highest severity among pose-eligible stats, but it can still crowd a pose-eligible stat (e.g. OBP) out of the top-3 *display* list purely because K% clears its own threshold by more. Pose selection shouldn't be affected by that unrelated display-cap collision, so it looks at the wider, uncapped set. Restrict that set to `{AVG, OBP, SLG, BBPct}` (K% has no positive pose — it's a rate to minimize, not something to depict). Take the single highest-severity entry among those and map to a pose:
 
 ```
 SLG          → 'power'
