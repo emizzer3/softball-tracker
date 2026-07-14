@@ -1153,14 +1153,8 @@ export default function PlayerCardModal({ name, onClose }) {
         <p className="text-center text-[10px] text-gray-400 mt-2 no-print">👆 tap the card to flip it</p>
 
         {/* Flat, non-flipped copies used for PNG capture (Download) and for printing
-            (both faces stacked). Positioned off-screen with `fixed -left-[9999px]`,
-            NOT `hidden`/`display:none` — html-to-image's toPng() reads clientWidth/
-            clientHeight on the target node, and a display:none ancestor collapses
-            those to 0, producing a blank/zero-size capture. `fixed` keeps the subtree
-            fully laid out (real dimensions) while staying invisible and out of the
-            modal's scrollable area. `print:static` restores normal flow for the
-            browser's print output so both faces show stacked, in place. */}
-        <div className="fixed top-0 -left-[9999px] flex flex-col items-center gap-4 print:static print:left-auto" aria-hidden="true">
+            (both faces stacked, shown only under @media print via .hidden/.print:block). */}
+        <div className="hidden print:flex print:flex-col print:items-center print:gap-4">
           <div ref={frontRef} className="pc-face-flat"><CardFront card={card} /></div>
           <div ref={backRef} className="pc-face-flat"><CardBack card={card} /></div>
         </div>
@@ -1180,7 +1174,7 @@ export default function PlayerCardModal({ name, onClose }) {
 }
 ```
 
-Note the capture container (`ref={frontRef}` / `ref={backRef}`) uses `fixed -left-[9999px]`, **not** `hidden`/`display:none` — `html-to-image`'s `toPng()` reads `clientWidth`/`clientHeight` on the target node to size the capture, and a `display:none` ancestor collapses those to `0`, producing a blank/zero-size PNG. `fixed` positioning keeps the subtree fully laid out (real, non-zero dimensions) while parking it off-screen and invisible, and it doesn't count toward the modal's `overflow-y-auto` scrollable area. `print:static` restores normal document flow specifically for the browser's native print dialog, so both faces print stacked, in place (this repo already relies on the plain `.no-print` custom class for the opposite direction — hiding on print — so this task is the first to use Tailwind's built-in `print:` variant for the reverse; both approaches coexist safely since they target different elements). `aria-hidden="true"` keeps this visual-only duplicate out of the accessibility tree.
+Note the capture container (`ref={frontRef}` / `ref={backRef}`) uses `hidden print:flex` — invisible on screen (so it doesn't show twice), but present in the DOM at all times so `toPng()` can capture it on demand without waiting for a visibility change, and shown for the browser's native print dialog via the existing Tailwind `print:` variant (this repo already relies on the plain `.no-print` custom class for the opposite direction — hiding on print — so this task is the first to use Tailwind's built-in `print:` variant for the reverse; both approaches coexist safely since they target different elements).
 
 - [ ] **Step 5: Run the test to verify it passes**
 

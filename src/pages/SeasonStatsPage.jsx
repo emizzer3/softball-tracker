@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Trophy, Calendar, Home, Trash2, BookOpen, X } from 'lucide-react'
+import PlayerCardModal from '../components/PlayerCardModal'
 import { getGames, computeSeasonStats, computePlayerGameLog, deleteGame, getSeasonRecord, computeRunsPerGame, computeGroupStats, computeSituationalStats } from '../storage'
 
 const STAT_TIPS = {
@@ -218,6 +219,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
   const [sortCol, setSortCol] = useState('AB')
   const [sortAsc, setSortAsc] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState(null)
+  const [viewCardPlayer, setViewCardPlayer] = useState(null)
   const [sprayFilter, setSprayFilter] = useState(null)   // batter name or null
   const [selectedDot, setSelectedDot] = useState(null)    // dot index or null
   const [tappedBar, setTappedBar] = useState(null)        // gameId or null
@@ -329,11 +331,21 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 <tbody>
                   {stats.map(p => (
                     <tr key={p.name} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td
-                        className="py-1.5 px-1 font-medium whitespace-nowrap cursor-pointer text-blue-700 hover:underline"
-                        onClick={() => setSelectedPlayer(p.name)}
-                      >
-                        {p.name}
+                      <td className="py-1.5 px-1 font-medium whitespace-nowrap">
+                        <span
+                          className="cursor-pointer text-blue-700 hover:underline"
+                          onClick={() => setSelectedPlayer(p.name)}
+                        >
+                          {p.name}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setViewCardPlayer(p.name) }}
+                          className="ml-1 align-middle"
+                          aria-label={`View ${p.name}'s card`}
+                          title="View Card"
+                        >
+                          🃏
+                        </button>
                       </td>
                       {[p.G, p.R || 0, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
                         <td key={i} className="py-1.5 px-0.5 text-center">{v}</td>
@@ -1000,6 +1012,7 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
       </div>
 
       {selectedPlayer && <PlayerDetailModal name={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
+      {viewCardPlayer && <PlayerCardModal name={viewCardPlayer} onClose={() => setViewCardPlayer(null)} />}
       {showGuide && <StatGuideSheet onClose={() => setShowGuide(false)} />}
     </div>
   )

@@ -1,0 +1,6 @@
+<svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="80" cy="80" r="68" fill="none" stroke="#1c2b4a" stroke-width="4"/>
+  <circle cx="80" cy="80" r="58" fill="none" stroke="#c0392b" stroke-width="2" stroke-dasharray="4 6"/>
+  <text x="80" y="75" text-anchor="middle" font-family="Georgia, serif" font-size="34">🎯</text>
+  <text x="80" y="112" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="bold" fill="#1c2b4a" letter-spacing="1">CONTACT</text>
+</svg>
