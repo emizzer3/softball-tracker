@@ -1,3 +1,5 @@
+import { FIELD_HOME } from './components/softballFieldConstants'
+
 // Keys
 const K = {
   ROSTER:      'sft_roster',
@@ -562,6 +564,76 @@ const RATE_THRESHOLD = 0.050
 const PCT_THRESHOLD = 5
 const POSE_STATS = ['AVG', 'OBP', 'SLG', 'BBPct']
 
+const OUT_TYPES_FOR_CARD = ['K', 'F', 'G', 'FC', 'SAC']
+const MIN_OUTS_FOR_BREAKDOWN = 3
+const MIN_ZONE_SAMPLE = 2
+const ZONE_ORDER = ['Infield Left', 'Infield Center', 'Infield Right', 'Outfield Left', 'Outfield Center', 'Outfield Right']
+
+function classifyZone(x, y) {
+  const dx = x - FIELD_HOME[0]
+  const dy = y - FIELD_HOME[1]
+  const angle = Math.atan2(dx, -dy) * (180 / Math.PI) // 0deg = straight up the middle, + = toward right field
+  const side = angle < -15 ? 'Left' : angle > 15 ? 'Right' : 'Center'
+  const distFromMound = Math.hypot(x - 140, y - 200) // infield-dirt circle center, matches ScoresheetPage
+  const depth = distFromMound <= 73 ? 'Infield' : 'Outfield' // matches ScoresheetPage's infield-dirt radius
+  return `${depth} ${side}`
+}
+
+function computeSeasonSpray(playerName, games) {
+  const dots = []
+  for (const game of games) {
+    for (const ab of (game.atBats || [])) {
+      if (ab.batter !== playerName || ab.isOpponent || !ab.hitLocation) continue
+      dots.push({
+        x: ab.hitLocation.x, y: ab.hitLocation.y, outcome: ab.outcome,
+        isHit: ['1B', '2B', '3B', 'HR'].includes(ab.outcome),
+      })
+    }
+  }
+  if (dots.length < MIN_AB_FOR_OWN_STATS) return { dots, bestZone: null, worstZone: null }
+
+  const zoneStats = {}
+  for (const dot of dots) {
+    const zone = classifyZone(dot.x, dot.y)
+    if (!zoneStats[zone]) zoneStats[zone] = { total: 0, hits: 0 }
+    zoneStats[zone].total++
+    if (dot.isHit) zoneStats[zone].hits++
+  }
+
+  const qualifying = ZONE_ORDER
+    .filter(zone => zoneStats[zone] && zoneStats[zone].total >= MIN_ZONE_SAMPLE)
+    .map(zone => ({ zone, ...zoneStats[zone], hitRate: zoneStats[zone].hits / zoneStats[zone].total }))
+
+  if (qualifying.length === 0) return { dots, bestZone: null, worstZone: null }
+
+  const byHitRateDesc = [...qualifying].sort((a, b) => b.hitRate - a.hitRate || b.hits - a.hits)
+  const byHitRateAsc  = [...qualifying].sort((a, b) => a.hitRate - b.hitRate || (b.total - b.hits) - (a.total - a.hits))
+  const topBest = byHitRateDesc[0]
+  const topWorst = byHitRateAsc[0]
+
+  if (topBest.zone === topWorst.zone) {
+    return topBest.hitRate >= 0.5
+      ? { dots, bestZone: topBest.zone, worstZone: null }
+      : { dots, bestZone: null, worstZone: topWorst.zone }
+  }
+  return { dots, bestZone: topBest.zone, worstZone: topWorst.zone }
+}
+
+function computeOutBreakdown(playerName, games) {
+  const counts = { K: 0, F: 0, G: 0, FC: 0, SAC: 0 }
+  let total = 0
+  for (const game of games) {
+    for (const ab of (game.atBats || [])) {
+      if (ab.batter !== playerName || ab.isOpponent) continue
+      if (OUT_TYPES_FOR_CARD.includes(ab.outcome)) { counts[ab.outcome]++; total++ }
+    }
+  }
+  const mostCommon = total >= MIN_OUTS_FOR_BREAKDOWN
+    ? OUT_TYPES_FOR_CARD.reduce((best, t) => (counts[t] > counts[best] ? t : best), OUT_TYPES_FOR_CARD[0])
+    : null
+  return { counts, total, mostCommon }
+}
+
 const RATE_TIPS = {
   AVG:   { strength: 'Hitting well above the team average — keep it up.', needsWork: 'Batting average is below the team average — focus on solid contact.' },
   OBP:   { strength: 'Excellent at getting on base.', needsWork: 'On-base rate is below average — look for more pitches to work the count.' },
@@ -588,8 +660,8 @@ export function computePlayerCard(playerName, gamesInput) {
   // Spray/out-type data doesn't depend on AB qualification, so it's computed once
   // up front and reused by both return paths below. Task 2 replaces these two
   // placeholders with real computation — no other line in this function changes.
-  const spray = { dots: [], bestZone: null, worstZone: null }
-  const outBreakdown = { counts: { K: 0, F: 0, G: 0, FC: 0, SAC: 0 }, total: 0, mostCommon: null }
+  const spray = computeSeasonSpray(playerName, games)
+  const outBreakdown = computeOutBreakdown(playerName, games)
 
   if (AB < MIN_AB_FOR_OWN_STATS) {
     return {
@@ -662,6 +734,9 @@ export function computePlayerCard(playerName, gamesInput) {
   else if (topPoseStat === 'AVG') { pose = 'contact'; headlineKey = 'AVG' }
   else if (topPoseStat === 'OBP' || topPoseStat === 'BBPct') { pose = 'patient'; headlineKey = 'OBP' }
   const headlineValue = headlineKey === 'AVG' ? AVG : headlineKey === 'OBP' ? OBP : SLG
+
+  if (spray.bestZone) strengths.push({ stat: 'SPRAY_BEST', message: `Best contact zone: ${spray.bestZone} — that's where most of your hits land.` })
+  if (spray.worstZone) needsWork.push({ stat: 'SPRAY_WORST', message: `A lot of outs come on balls hit to ${spray.worstZone} — worth working on in BP.` })
 
   const neutral = strengths.length === 0 && needsWork.length === 0
 

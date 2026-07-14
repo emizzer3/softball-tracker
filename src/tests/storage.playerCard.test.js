@@ -167,3 +167,138 @@ describe('computePlayerCard — neutral and cold-start', () => {
     expect(card.AVG).toBe('.000')
   })
 })
+
+describe('computePlayerCard — spray-zone insight', () => {
+  const SPRAY_ROSTER = [{ id: '1', name: 'PlayerE', type: 'BBH', active: true }]
+
+  function sprayGame(hitDots, outDots) {
+    const atBats = [
+      ...hitDots.map(([x, y], i) => ({ id: `h${i}`, batter: 'PlayerE', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false], hitLocation: { x, y } })),
+      ...outDots.map(([x, y], i) => ({ id: `o${i}`, batter: 'PlayerE', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false], hitLocation: { x, y } })),
+    ]
+    saveGame({ id: 'gs', date: '2024-05-01', gameType: 'League', home: 'Renegades', away: 'Bulls', homeScore: 1, awayScore: 0, result: 'W', roster: SPRAY_ROSTER, atBats, playLog: [] })
+  }
+
+  it('identifies a clear best zone (hits) and worst zone (outs)', () => {
+    // 3 hits straight up the middle, deep (Outfield Center); 3 outs short and to the
+    // left of home (Infield Left). 6 located at-bats total, both zones have samples >= 2.
+    sprayGame(
+      [[140, 50], [135, 55], [145, 45]],
+      [[100, 230], [105, 225], [95, 235]],
+    )
+    const card = computePlayerCard('PlayerE')
+    expect(card.spray.dots).toHaveLength(6)
+    expect(card.spray.bestZone).toBe('Outfield Center')
+    expect(card.spray.worstZone).toBe('Infield Left')
+    expect(card.strengths.some(s => s.stat === 'SPRAY_BEST' && s.message.includes('Outfield Center'))).toBe(true)
+    expect(card.needsWork.some(s => s.stat === 'SPRAY_WORST' && s.message.includes('Infield Left'))).toBe(true)
+  })
+
+  it('leaves bestZone/worstZone null below the 5-located-AB threshold, but still returns dots', () => {
+    sprayGame([[140, 50], [135, 55]], [[100, 230]]) // 3 located at-bats total
+    const card = computePlayerCard('PlayerE')
+    expect(card.spray.dots).toHaveLength(3)
+    expect(card.spray.bestZone).toBeNull()
+    expect(card.spray.worstZone).toBeNull()
+  })
+
+  it('reports only one of bestZone/worstZone when just one zone ever qualifies', () => {
+    // 2 hits in Outfield Center (qualifies, total=2), plus 3 more located at-bats each
+    // in a different zone (Infield Left, Infield Right, Outfield Left) with only 1 each
+    // -- none of those reach the 2-sample zone minimum, so only Outfield Center qualifies.
+    // hitRate there is 1.0 (>= 0.5) so it's reported as bestZone only.
+    sprayGame(
+      [[140, 50], [135, 55]],
+      [[100, 230], [180, 230], [20, 130]],
+    )
+    const card = computePlayerCard('PlayerE')
+    expect(card.spray.dots).toHaveLength(5)
+    expect(card.spray.bestZone).toBe('Outfield Center')
+    expect(card.spray.worstZone).toBeNull()
+  })
+
+  it('marks neutral: false when the only signal is a spray tip, not a rate-stat tip', () => {
+    // PlayerF and Teammate have identical aggregate stats (AB=10 H=5 K=2 BB=0 each) ->
+    // baseline equals PlayerF's own rates exactly -> no rate-stat strengths/needsWork.
+    // 3 of PlayerF's hits are located in Outfield Center, 3 of their outs (G) in
+    // Infield Left -> a real spray pattern despite the rate-stat tie.
+    saveGame({
+      id: 'gn', date: '2024-05-01', gameType: 'League',
+      home: 'Renegades', away: 'Bulls', homeScore: 1, awayScore: 0, result: 'W',
+      roster: [
+        { id: '1', name: 'PlayerF', type: 'BBH', active: true },
+        { id: '2', name: 'Teammate', type: 'BBH', active: true },
+      ],
+      atBats: [
+        { id: 'f-h0', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false], hitLocation: { x: 140, y: 50 } },
+        { id: 'f-h1', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false], hitLocation: { x: 135, y: 55 } },
+        { id: 'f-h2', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false], hitLocation: { x: 145, y: 45 } },
+        { id: 'f-h3', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 'f-h4', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 'f-g0', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false], hitLocation: { x: 100, y: 230 } },
+        { id: 'f-g1', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false], hitLocation: { x: 105, y: 225 } },
+        { id: 'f-g2', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false], hitLocation: { x: 95, y: 235 } },
+        { id: 'f-k0', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
+        { id: 'f-k1', batter: 'PlayerF', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
+        // Teammate: same composition as PlayerF (5x '1B', 3x 'G', 2x 'K' -> AB=10 H=5 K=2 BB=0),
+        // built explicitly rather than via makeAtBats (which only ever labels outs 'K', so it
+        // can't produce a 5/3/2 split of 1B/G/K on its own). No hitLocation needed here — spray
+        // is keyed by batter name, so Teammate's dots (there are none) don't affect PlayerF's.
+        { id: 't-h0', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-h1', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-h2', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-h3', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-h4', batter: 'Teammate', inning: 1, half: 'bottom', outcome: '1B', rbi: 0, bases: [false, false, false] },
+        { id: 't-g0', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false] },
+        { id: 't-g1', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false] },
+        { id: 't-g2', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false] },
+        { id: 't-k0', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
+        { id: 't-k1', batter: 'Teammate', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
+      ],
+      playLog: [],
+    })
+    const card = computePlayerCard('PlayerF')
+    expect(card.strengths.filter(s => s.stat !== 'SPRAY_BEST')).toEqual([])
+    expect(card.needsWork.filter(s => s.stat !== 'SPRAY_WORST')).toEqual([])
+    expect(card.spray.bestZone).toBe('Outfield Center')
+    expect(card.spray.worstZone).toBe('Infield Left')
+    expect(card.neutral).toBe(false)
+  })
+})
+
+describe('computePlayerCard — out-type breakdown', () => {
+  it('identifies the most common out type', () => {
+    const atBats = [
+      ...Array.from({ length: 4 }, (_, i) => ({ id: `k${i}`, batter: 'PlayerG', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] })),
+      ...Array.from({ length: 2 }, (_, i) => ({ id: `g${i}`, batter: 'PlayerG', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false] })),
+      { id: 'f0', batter: 'PlayerG', inning: 1, half: 'bottom', outcome: 'F', rbi: 0, bases: [false, false, false] },
+    ]
+    saveGame({ id: 'go1', date: '2024-05-01', gameType: 'League', home: 'Renegades', away: 'Bulls', homeScore: 1, awayScore: 0, result: 'W', roster: [{ id: '1', name: 'PlayerG', type: 'BBH', active: true }], atBats, playLog: [] })
+    const card = computePlayerCard('PlayerG')
+    expect(card.outBreakdown.total).toBe(7)
+    expect(card.outBreakdown.mostCommon).toBe('K')
+  })
+
+  it('returns mostCommon: null below MIN_OUTS_FOR_BREAKDOWN (3)', () => {
+    const atBats = [
+      { id: 'k0', batter: 'PlayerH', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
+      { id: 'g0', batter: 'PlayerH', inning: 1, half: 'bottom', outcome: 'G', rbi: 0, bases: [false, false, false] },
+    ]
+    saveGame({ id: 'go2', date: '2024-05-01', gameType: 'League', home: 'Renegades', away: 'Bulls', homeScore: 1, awayScore: 0, result: 'W', roster: [{ id: '1', name: 'PlayerH', type: 'BBH', active: true }], atBats, playLog: [] })
+    const card = computePlayerCard('PlayerH')
+    expect(card.outBreakdown.total).toBe(2)
+    expect(card.outBreakdown.mostCommon).toBeNull()
+  })
+
+  it('breaks a tie using OUT_TYPES order (K before F)', () => {
+    const atBats = [
+      { id: 'k0', batter: 'PlayerI', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
+      { id: 'k1', batter: 'PlayerI', inning: 1, half: 'bottom', outcome: 'K', rbi: 0, bases: [false, false, false] },
+      { id: 'f0', batter: 'PlayerI', inning: 1, half: 'bottom', outcome: 'F', rbi: 0, bases: [false, false, false] },
+      { id: 'f1', batter: 'PlayerI', inning: 1, half: 'bottom', outcome: 'F', rbi: 0, bases: [false, false, false] },
+    ]
+    saveGame({ id: 'go3', date: '2024-05-01', gameType: 'League', home: 'Renegades', away: 'Bulls', homeScore: 1, awayScore: 0, result: 'W', roster: [{ id: '1', name: 'PlayerI', type: 'BBH', active: true }], atBats, playLog: [] })
+    const card = computePlayerCard('PlayerI')
+    expect(card.outBreakdown.mostCommon).toBe('K')
+  })
+})
