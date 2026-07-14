@@ -76,12 +76,20 @@ describe('computePlayerCard — qualifying player with strengths and needs-work'
     // Mate1 & Mate2 (identical): hits=3, outs=7, walks=4 -> AB=10, H=3, K=7, BB=4 -> AVG=.300 OBP=7/14=.500 SLG=.300 KPct=70.0 BBPct=4/14*100=28.6
     // Baseline (raw sums across all 3, PlayerX included, per spec Step 3):
     //   AB=30 H=12 BB=8 K=18 TB=12 -> AVG=.400 OBP=20/38=.5263 SLG=.400 KPct=18/30*100=60.0 BBPct=8/38*100=21.05
-    // Severities: AVG=(.6-.4)/.05=4.0  OBP=(.6-.5263)/.05=1.47  SLG=4.0  KPct=((40-60)*-1)/5=4.0  BBPct=(0-21.05)/5=-4.21
-    // Strengths sorted desc: AVG(4.0), SLG(4.0), KPct(4.0) tied — tie broken by original AVG/OBP/SLG/KPct/BBPct
-    // iteration order, so AVG then SLG then KPct — then OBP(1.47) last among strengths.
-    // -> capped top 3 display: AVG, SLG, KPct (OBP loses the cap slot to KPct despite being pose-eligible)
-    // -> pose picked from the FULL uncapped set restricted to {AVG,OBP,SLG,BBPct}: AVG(4.0) beats SLG(4.0, later in
-    //    the stable sort) and OBP(1.47) -> pose 'contact', headline AVG
+    // Severities: AVG=(.6-.4)/.05  OBP=(.6-.5263)/.05=1.47  SLG=(.6-.4)/.05  KPct=((40-60)*-1)/5=4  BBPct=(0-21.05)/5=-4.21
+    // AVG and SLG are algebraically 4.0, and KPct is also algebraically 4 — but they are NOT a real tie in IEEE-754:
+    // AVG/SLG both go through `0.6 - 12/30`, which hits the classic floating-point rounding artifact and evaluates
+    // to 3.999999999999999, not 4 — while KPct's path (`(40-60)*-1/5` = `20/5`) is exact integer division and lands
+    // on precisely 4. Since 4 > 3.999999999999999, the real severity-descending order is KPct, then AVG, then SLG
+    // (AVG before SLG between those two, by the original AVG/OBP/SLG/KPct/BBPct iteration order, since AVG and SLG
+    // ARE bit-identical to each other). Do not "round" this away — it's deterministic, portable IEEE-754 behavior,
+    // not implementation-specific or flaky, and matches how any correct implementation of this exact arithmetic
+    // will behave in JS.
+    // Strengths sorted desc: KPct(4), AVG(3.999999999999999), SLG(3.999999999999999) — then OBP(1.47) last.
+    // -> capped top 3 display: KPct, AVG, SLG (OBP loses the cap slot to KPct despite being pose-eligible)
+    // -> pose picked from the FULL uncapped set restricted to {AVG,OBP,SLG,BBPct} (KPct is excluded from this set
+    //    regardless of its severity): AVG beats SLG (bit-identical, AVG earlier in iteration order) and OBP(1.47)
+    //    -> pose 'contact', headline AVG
     seedGame('g1', ROSTER,
       ['PlayerX', 6, 4, 0],
       ['Mate1', 3, 7, 4],
@@ -91,7 +99,7 @@ describe('computePlayerCard — qualifying player with strengths and needs-work'
 
     expect(card.qualifies).toBe(true)
     expect(card.AVG).toBe('.600')
-    expect(card.strengths.map(s => s.stat)).toEqual(['AVG', 'SLG', 'KPct'])
+    expect(card.strengths.map(s => s.stat)).toEqual(['KPct', 'AVG', 'SLG'])
     expect(card.needsWork.map(s => s.stat)).toEqual(['BBPct'])
     expect(card.pose).toBe('contact')
     expect(card.headlineStat).toEqual({ key: 'AVG', value: '.600' })
