@@ -556,3 +556,121 @@ export function getSeasonRecord() {
 // Phase 2 will extend this with { teamId: string, shortId: string }
 export function getTeamConfig() { return get(K.TEAM, null) }
 export function setTeamConfig(config) { set(K.TEAM, config) }
+
+// ── Mid-season player card ──────────────────────────────────────────────
+const RATE_THRESHOLD = 0.050
+const PCT_THRESHOLD = 5
+const POSE_STATS = ['AVG', 'OBP', 'SLG', 'BBPct']
+
+const RATE_TIPS = {
+  AVG:   { strength: 'Hitting well above the team average — keep it up.', needsWork: 'Batting average is below the team average — focus on solid contact.' },
+  OBP:   { strength: 'Excellent at getting on base.', needsWork: 'On-base rate is below average — look for more pitches to work the count.' },
+  SLG:   { strength: 'Strong extra-base power.', needsWork: 'Limited extra-base pop so far — look to drive the ball with authority.' },
+  KPct:  { strength: 'Rarely strikes out — great plate discipline.', needsWork: 'Strikeout rate is high — see the ball, shorten the swing.' },
+  BBPct: { strength: 'Draws a lot of walks — great eye at the plate.', needsWork: 'Rarely walks — work the count and be more selective.' },
+}
+
+export function computePlayerCard(playerName, gamesInput) {
+  const games = gamesInput || getGames()
+  const seasonStats = computeSeasonStats(games)
+  const player = seasonStats.find(s => s.name === playerName)
+  const roster = getRoster()
+  const type = roster.find(p => p.name === playerName)?.type
+
+  const G     = player?.G || 0
+  const AB    = player?.AB || 0
+  const AVG   = player?.AVG || '.000'
+  const OBP   = player?.OBP || '.000'
+  const SLG   = player?.SLG || '.000'
+  const KPct  = player?.KPct || '0.0'
+  const BBPct = player?.BBPct || '0.0'
+
+  // Spray/out-type data doesn't depend on AB qualification, so it's computed once
+  // up front and reused by both return paths below. Task 2 replaces these two
+  // placeholders with real computation — no other line in this function changes.
+  const spray = { dots: [], bestZone: null, worstZone: null }
+  const outBreakdown = { counts: { K: 0, F: 0, G: 0, FC: 0, SAC: 0 }, total: 0, mostCommon: null }
+
+  if (AB < MIN_AB_FOR_OWN_STATS) {
+    return {
+      name: playerName, type, qualifies: false,
+      G, AB, AVG, OBP, SLG, KPct, BBPct,
+      pose: 'ready',
+      headlineStat: { key: 'AVG', value: AVG },
+      strengths: [], needsWork: [], neutral: true,
+      spray, outBreakdown,
+    }
+  }
+
+  // Team-average baseline: same type, qualifying teammates only (includes this
+  // player themselves if they qualify — matches computeGroupStats' existing
+  // "all qualifying players of this type" semantics).
+  const teammates = seasonStats.filter(s => {
+    const t = roster.find(p => p.name === s.name)?.type
+    return t === type && s.AB >= MIN_AB_FOR_OWN_STATS
+  })
+
+  let baseAB = 0, baseH = 0, baseBB = 0, baseK = 0, baseTB = 0
+  for (const t of teammates) {
+    const singles = t.H - t['2B'] - t['3B'] - t.HR
+    baseTB += singles + t['2B'] * 2 + t['3B'] * 3 + t.HR * 4
+    baseAB += t.AB; baseH += t.H; baseBB += t.BB; baseK += t.K
+  }
+  const baseline = {
+    AVG:   baseAB > 0 ? baseH / baseAB : 0,
+    OBP:   (baseAB + baseBB) > 0 ? (baseH + baseBB) / (baseAB + baseBB) : 0,
+    SLG:   baseAB > 0 ? baseTB / baseAB : 0,
+    KPct:  baseAB > 0 ? (baseK / baseAB) * 100 : 0,
+    BBPct: (baseAB + baseBB) > 0 ? (baseBB / (baseAB + baseBB)) * 100 : 0,
+  }
+
+  const playerRates = {
+    AVG: parseFloat(AVG), OBP: parseFloat(OBP), SLG: parseFloat(SLG),
+    KPct: parseFloat(KPct), BBPct: parseFloat(BBPct),
+  }
+
+  // Severity = signedGap / threshold. Normalizes AVG/OBP/SLG (gaps ~0-0.3) against
+  // KPct/BBPct (gaps ~0-50 points) onto a comparable scale before ranking — sorting
+  // by raw gap would let KPct/BBPct dominate every ranking regardless of how
+  // meaningful the AVG/OBP/SLG difference actually is.
+  const rateStrengths = []
+  const rateNeedsWork = []
+  for (const stat of ['AVG', 'OBP', 'SLG', 'KPct', 'BBPct']) {
+    const threshold = (stat === 'KPct' || stat === 'BBPct') ? PCT_THRESHOLD : RATE_THRESHOLD
+    const inverted = stat === 'KPct' // lower is better
+    const rawGap = playerRates[stat] - baseline[stat]
+    const signedGap = inverted ? -rawGap : rawGap
+    const severity = signedGap / threshold
+    if (severity >= 1) rateStrengths.push({ stat, message: RATE_TIPS[stat].strength, severity })
+    else if (severity <= -1) rateNeedsWork.push({ stat, message: RATE_TIPS[stat].needsWork, severity })
+  }
+  rateStrengths.sort((a, b) => b.severity - a.severity)
+  rateNeedsWork.sort((a, b) => a.severity - b.severity)
+
+  const strengths = rateStrengths.slice(0, 3).map(({ stat, message }) => ({ stat, message }))
+  const needsWork = rateNeedsWork.slice(0, 3).map(({ stat, message }) => ({ stat, message }))
+
+  // Pose uses the FULL uncapped rateStrengths list (not the display-capped
+  // `strengths` above), restricted to the 4 pose-eligible stats — a non-pose stat
+  // (KPct) crowding a pose-eligible stat out of the top-3 display cap must not
+  // affect which pose gets picked.
+  const poseEligible = rateStrengths.filter(s => POSE_STATS.includes(s.stat))
+  const topPoseStat = poseEligible[0]?.stat
+  let pose = 'ready'
+  let headlineKey = 'AVG'
+  if (topPoseStat === 'SLG') { pose = 'power'; headlineKey = 'SLG' }
+  else if (topPoseStat === 'AVG') { pose = 'contact'; headlineKey = 'AVG' }
+  else if (topPoseStat === 'OBP' || topPoseStat === 'BBPct') { pose = 'patient'; headlineKey = 'OBP' }
+  const headlineValue = headlineKey === 'AVG' ? AVG : headlineKey === 'OBP' ? OBP : SLG
+
+  const neutral = strengths.length === 0 && needsWork.length === 0
+
+  return {
+    name: playerName, type, qualifies: true,
+    G, AB, AVG, OBP, SLG, KPct, BBPct,
+    pose,
+    headlineStat: { key: headlineKey, value: headlineValue },
+    strengths, needsWork, neutral,
+    spray, outBreakdown,
+  }
+}
