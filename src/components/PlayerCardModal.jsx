@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Download, Printer } from 'lucide-react'
+import { toPng } from 'html-to-image'
 import { computePlayerCard } from '../storage'
 import swingPower from '../assets/cards/swing-power.svg'
 import swingContact from '../assets/cards/swing-contact.svg'
@@ -103,9 +104,44 @@ function CardBack({ card }) {
   )
 }
 
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
+}
+
 export default function PlayerCardModal({ name, onClose }) {
   const [flipped, setFlipped] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const card = computePlayerCard(name)
+  const frontRef = useRef(null)
+  const backRef = useRef(null)
+
+  async function handleDownload() {
+    setDownloading(true)
+    try {
+      const [frontPng, backPng] = await Promise.all([
+        toPng(frontRef.current, { pixelRatio: 2 }),
+        toPng(backRef.current, { pixelRatio: 2 }),
+      ])
+      const [frontImg, backImg] = await Promise.all([loadImage(frontPng), loadImage(backPng)])
+      const canvas = document.createElement('canvas')
+      canvas.width = frontImg.width
+      canvas.height = frontImg.height + backImg.height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(frontImg, 0, 0)
+      ctx.drawImage(backImg, 0, frontImg.height)
+      const link = document.createElement('a')
+      link.download = `${name.replace(/\s+/g, '-')}-card.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end z-50" onClick={onClose}>
@@ -121,6 +157,7 @@ export default function PlayerCardModal({ name, onClose }) {
           .pc-wrap.flipped .pc-inner { transform: rotateY(180deg); }
           .pc-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 10px; border: 5px solid #1c2b4a; background: #f3ead9; font-family: Georgia, serif; overflow: hidden; }
           .pc-back { transform: rotateY(180deg); }
+          .pc-face-flat { width: 280px; height: 400px; border-radius: 10px; border: 5px solid #1c2b4a; background: #f3ead9; font-family: Georgia, serif; overflow: hidden; position: relative; }
         `}</style>
 
         <div className={`pc-wrap no-print ${flipped ? 'flipped' : ''}`} onClick={() => setFlipped(f => !f)}>
@@ -131,7 +168,32 @@ export default function PlayerCardModal({ name, onClose }) {
         </div>
         <p className="text-center text-[10px] text-gray-400 mt-2 no-print">👆 tap the card to flip it</p>
 
-        <button onClick={onClose} className="btn btn-primary btn-md w-full mt-4 no-print">Close</button>
+        {/* Flat, non-flipped copies used for PNG capture (Download) and for printing
+            (both faces stacked). Positioned off-screen with `fixed` + a large negative
+            `left` — NOT `display:none` — because html-to-image's toPng() measures
+            node.clientWidth/clientHeight to size the capture; a display:none ancestor
+            collapses that to 0 and produces a blank/zero-size PNG. `position:fixed`
+            keeps real layout dimensions while staying invisible on screen and out of
+            any ancestor's scrollable area. `print:static` restores normal flow so the
+            browser's print output shows both faces stacked in place. aria-hidden keeps
+            screen readers from announcing this duplicate copy. */}
+        <div
+          aria-hidden="true"
+          className="fixed top-0 -left-[9999px] flex flex-col items-center gap-4 print:static print:left-auto"
+        >
+          <div ref={frontRef} className="pc-face-flat"><CardFront card={card} /></div>
+          <div ref={backRef} className="pc-face-flat"><CardBack card={card} /></div>
+        </div>
+
+        <div className="flex gap-2 mt-4 no-print">
+          <button onClick={handleDownload} disabled={downloading} className="btn btn-ghost btn-md flex-1 gap-1">
+            <Download size={16} /> {downloading ? 'Saving…' : 'Download'}
+          </button>
+          <button onClick={() => window.print()} className="btn btn-ghost btn-md flex-1 gap-1">
+            <Printer size={16} /> Print
+          </button>
+        </div>
+        <button onClick={onClose} className="btn btn-primary btn-md w-full mt-2 no-print">Close</button>
       </div>
     </div>
   )

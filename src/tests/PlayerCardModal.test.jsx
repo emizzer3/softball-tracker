@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import PlayerCardModal from '../components/PlayerCardModal'
 import { saveGame } from '../storage'
@@ -57,5 +57,23 @@ describe('PlayerCardModal', () => {
     render(<PlayerCardModal name="Amy" onClose={() => { closed = true }} />)
     fireEvent.click(screen.getByText('Close'))
     expect(closed).toBe(true)
+  })
+})
+
+describe('PlayerCardModal — download and print', () => {
+  it('renders Download and Print buttons', () => {
+    seedQualifyingPlayer()
+    render(<PlayerCardModal name="Amy" onClose={() => {}} />)
+    expect(screen.getByRole('button', { name: /download/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument()
+  })
+
+  it('calls window.print when Print is clicked', () => {
+    seedQualifyingPlayer()
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+    render(<PlayerCardModal name="Amy" onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    expect(printSpy).toHaveBeenCalledOnce()
+    printSpy.mockRestore()
   })
 })
