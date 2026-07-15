@@ -31,7 +31,7 @@ function MiniSprayDiagram({ dots }) {
   )
 }
 
-function CardFront({ card }) {
+export function CardFront({ card }) {
   return (
     <>
       <div style={{ background: '#1c2b4a', padding: '10px 12px', textAlign: 'center' }}>

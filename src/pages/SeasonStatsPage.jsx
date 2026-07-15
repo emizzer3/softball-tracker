@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Trophy, Calendar, Home, Trash2, BookOpen, X } from 'lucide-react'
-import PlayerCardModal from '../components/PlayerCardModal'
-import { getGames, computeSeasonStats, computePlayerGameLog, deleteGame, getSeasonRecord, computeRunsPerGame, computeGroupStats, computeSituationalStats } from '../storage'
+import PlayerCardModal, { CardFront } from '../components/PlayerCardModal'
+import { getGames, computeSeasonStats, computePlayerGameLog, deleteGame, getSeasonRecord, computeRunsPerGame, computeGroupStats, computeSituationalStats, computePlayerCard } from '../storage'
 
 const STAT_TIPS = {
   G:    { label: 'Games',           desc: 'Number of games this player batted in.' },
@@ -296,6 +296,12 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                 💡 Players
               </button>
               <button
+                onClick={() => setActiveTab('cards')}
+                className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'cards' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                🃏 Cards
+              </button>
+              <button
                 onClick={() => setActiveTab('trends')}
                 className={`px-3 py-1 rounded text-sm font-semibold transition-colors ${activeTab === 'trends' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
               >
@@ -338,14 +344,6 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                         >
                           {p.name}
                         </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setViewCardPlayer(p.name) }}
-                          className="ml-1 align-middle"
-                          aria-label={`View ${p.name}'s card`}
-                          title="View Card"
-                        >
-                          🃏
-                        </button>
                       </td>
                       {[p.G, p.R || 0, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
                         <td key={i} className="py-1.5 px-0.5 text-center">{v}</td>
@@ -977,6 +975,33 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
               </div>
             )
           })()}
+
+          {/* Cards tab */}
+          {activeTab === 'cards' && (
+            <div className="grid grid-cols-2 gap-3">
+              {[...stats].sort((a, b) => a.name.localeCompare(b.name)).map(p => {
+                const card = computePlayerCard(p.name)
+                return (
+                  <button
+                    key={p.name}
+                    onClick={() => setViewCardPlayer(p.name)}
+                    aria-label={`View ${p.name}'s card`}
+                    className="text-left"
+                  >
+                    <div style={{ width: 140, height: 200, overflow: 'hidden' }}>
+                      <div style={{
+                        width: 280, height: 400, transform: 'scale(0.5)', transformOrigin: 'top left',
+                        border: '5px solid #1c2b4a', borderRadius: 10, background: '#f3ead9',
+                        fontFamily: 'Georgia, serif', overflow: 'hidden', position: 'relative',
+                      }}>
+                        <CardFront card={card} />
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
         </div>
       )}
