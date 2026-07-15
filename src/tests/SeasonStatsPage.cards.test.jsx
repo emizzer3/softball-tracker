@@ -46,3 +46,16 @@ describe('SeasonStatsPage — Cards tab', () => {
     expect(screen.getByText("Bob's Card")).toBeInTheDocument()
   })
 })
+
+describe('SeasonStatsPage — Batting tab', () => {
+  beforeEach(() => {
+    vi.spyOn(storage, 'computeSeasonStats').mockReturnValue(mockStats)
+    vi.spyOn(storage, 'getSeasonRecord').mockReturnValue({ W: 2, L: 1, D: 0 })
+    vi.spyOn(storage, 'getGames').mockReturnValue([])
+  })
+
+  it('no longer renders a card-view control (Batting is the default tab)', () => {
+    render(<SeasonStatsPage onHome={() => {}} onViewGame={() => {}} />)
+    expect(screen.queryByLabelText(/^View .*'s card$/)).not.toBeInTheDocument()
+  })
+})

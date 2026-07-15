@@ -344,14 +344,6 @@ export default function SeasonStatsPage({ onHome, onViewGame }) {
                         >
                           {p.name}
                         </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setViewCardPlayer(p.name) }}
-                          className="ml-1 align-middle"
-                          aria-label={`View ${p.name}'s card`}
-                          title="View Card"
-                        >
-                          🃏
-                        </button>
                       </td>
                       {[p.G, p.R || 0, p.AB, p.H, p['2B'], p['3B'], p.HR, p.RBI, p.BB, p.K].map((v, i) => (
                         <td key={i} className="py-1.5 px-0.5 text-center">{v}</td>
